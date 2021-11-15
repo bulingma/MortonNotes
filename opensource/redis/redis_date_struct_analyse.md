@@ -2,6 +2,14 @@
 <!-- TOC -->
 
 - [redis encoding type汇总](#redis-encoding-type汇总)
+- [SDS——简单动态字符串](#sds简单动态字符串)
+  - [sds的用途](#sds的用途)
+    - [实现字符串对像](#实现字符串对像)
+    - [Redis中的字符串](#redis中的字符串)
+  - [sds的实现](#sds的实现)
+    - [优化追加操作](#优化追加操作)
+    - [sds模块的API](#sds模块的api)
+  - [小结](#小结)
 - [linkedlist——双端链表](#linkedlist双端链表)
   - [双端链表的应用](#双端链表的应用)
     - [实现Redis的列表类型](#实现redis的列表类型)
@@ -41,6 +49,73 @@
 | zset   | skiplist         | 当ziplist条件不满足时                                                                                                              |
 | zset   | ziplist          | 有序集合的元素个数小于zset-max-ziplist-entries配置(默认128个)，同时每个元素的值都小于zset-max-ziplist-value配置(默认64字节)时      |
 
+## SDS——简单动态字符串
+Sds（Simple Dynamic String，简单动态字符串）是Redis底层所使用的字符串表示，它被用在几乎所有的Redis模块中。本章将对sds的实现、性能和功能等方面进行介绍，并说明Redis使用sds而不是传统C字符串的原因。
+### sds的用途  
+Sds在Redis中的主要作用有以下两个：  
+1.实现字符串对象（StringObject）；  
+2.在Redis程序内部用作char*类型的替代品；  
+以下两个小节分别对这两种用途进行介绍。  
+
+#### 实现字符串对像
+Redis是一个键值对数据库（key-value DB），数据库的值可以是字符串、集合、列表等多种类型的对象，而**数据库的键则总是字符串对象。对于那些包含字符串值的字符串对象来说，每个字符串对象都包含一个sds值**
+将sds代替C默认的char* 类型  
+因为char* 类型的功能单一，抽象层次低，并且不能高效地支持一些Redis常用的操作（比如追加操作和长度计算操作），所以在Redis程序内部，绝大部分情况下都会使用sds而不是char* 来表示字符串。
+
+#### Redis中的字符串  
+在C语言中，字符串可以用一个\0结尾的char数组来表示。比如说，hello world在C语言中就可以表示为"hello world\0"。这种简单的字符串表示在大多数情况下都能满足要求，但是，它并不能高效地支持长度计算和追加（append）这两种操作：  
+• 每次计算字符串长度（strlen(s)）的复杂度为O(N)。  
+• 对字符串进行N次追加，必定需要对字符串进行N次内存重分配（realloc）。  
+在Redis内部，字符串的追加和长度计算并不少见，而APPEND和STRLEN更是这两种操作在Redis命令中的直接映射，这两个简单的操作不应该成为性能的瓶颈。另外，Redis除了处理C字符串之外，还需要处理单纯的字节数组，以及服务器协议等内容，所以为了方便起见，Redis的字符串表示还应该是二进制安全的：程序不应对字符串里面保存的数据做任何假设，数据可以是以\0结尾的C字符串，也可以是单纯的字节数组，或者其他格式的数据。  
+考虑到这两个原因，Redis使用sds类型替换了C语言的默认字符串表示：**sds既可以高效地实现追加和长度计算，并且它还是二进制安全的。**
+
+### sds的实现  
+在前面的内容中，我们一直将sds作为一种抽象数据结构来说明，实际上，它的实现由以下两部分组成：
+```
+/*
+ * 类型别名，用于指向 sdshdr 的 buf 属性
+ */
+typedef char *sds;
+
+/*
+ * 保存字符串对象的结构
+ */
+struct sdshdr {
+    // buf 中已占用空间的长度
+    int len;
+    // buf 中剩余可用空间的长度
+    int free;
+    // 数据空间
+    char buf[];
+};
+```
+其中，类型sds是char *的别名(alias)，而结构sdshdr则保存了len、free和buf三个属性。  
+作为例子，以下是新创建的，同样保存hello world字符串的sdshdr结构：  
+```
+structsdshdr {
+  len=11;
+  free=0;
+  buf="hello world\0";// buf的实际长度为len + 1
+  };
+```
+通过len属性，sdshdr可以实现复杂度为O(1)的长度计算操作。另一方面，通过对buf分配一些额外的空间，并使用free记录未使用空间的大小，sdshdr可以让执行追加操作所需的内存重分配次数大大减少，sds也对操作的正确实现提出了要求——所有处理sdshdr的函数，都必须正确地更新len和free属性，否则就会造成bug。
+
+#### 优化追加操作  
+在前面说到过，利用sdshdr结构，除了可以用O(1)复杂度获取字符串的长度之外，还可以减少追加(append)操作所需的内存重分配次数。当调用SET命令创建sdshdr时，sdshdr的free属性为0，Redis也没有为buf创建额外的空间——而在执行APPEND之后，Redis为buf创建了多于所需空间一倍的大小。
+在目前版本的Redis中，SDS_MAX_PREALLOC的值为1024 * 1024，也就是说，当大小小于1MB的字符串执行追加操作时，sdsMakeRoomFor就为它们分配多于所需大小一倍的空间；当字符串的大小大于1MB，那么sdsMakeRoomFor就为它们额外多分配1MB的空间。 
+
+#### sds模块的API  
+sds模块基于sds类型和sdshdr结构提供了以下API：
+![sds api](../../z_images/redis/sds_api.png)  
+sds还有另一部分功能性函数，比如sdstolower、sdstrim、sdscmp，等等，基本都是标准C字符串库函数的sds版本，这里不一一列举了。
+
+### 小结  
+1. Redis的字符串表示为sds，而不是C字符串（以\0结尾的char*）。  
+2. 对比C字符串，sds有以下特性：  
+  –可以高效地执行长度计算（strlen）；  
+  –可以高效地执行追加操作（append）；  
+  –二进制安全；
+3. sds会为追加操作进行优化：加快追加操作的速度，并降低内存分配的次数，代价是多占用了一些内存，而且这些内存不会被主动释放。  
 
 ## linkedlist——双端链表
 ### 双端链表的应用
