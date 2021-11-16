@@ -24,9 +24,14 @@
   - [字典的定义](#字典的定义)
   - [字典的方法](#字典的方法)
   - [字典的剖析](#字典的剖析)
+- [skiplist（zset使用）](#skiplistzset使用)
+  - [跳跃表的实现](#跳跃表的实现)
+    - [跳跃表定义](#跳跃表定义)
+    - [跳跃表api](#跳跃表api)
+    - [跳跃表的应用](#跳跃表的应用)
+    - [跳跃表小结](#跳跃表小结)
 - [quicklist（list使用）](#quicklistlist使用)
 - [ziplist(zset/hash/list内部元素个数小于512、128个&每个元素值小于64字节时使用)](#ziplistzsethashlist内部元素个数小于512128个每个元素值小于64字节时使用)
-- [skiplist（zset使用）](#skiplistzset使用)
 
 <!-- /TOC -->
 ## redis encoding type汇总
@@ -319,9 +324,74 @@ typedef struct dict {
  2.强制rehash：ratio大 于 变 量dict_force_resize_ratio（目 前 版 本 中，dict_force_resize_ratio的值为5）。  
  Note:什么时候dict_can_resize会为假？在前面介绍字典的应用时也说到过，一个数据库就是一个字典，数据库里的哈希类型键也是一个字典，当Redis使用子进程对数据库执行后台持久化任务时（比如执行BGSAVE或BGREWRITEAOF时），为了最大化地利用系统的copy on write机制，程序会暂时将dict_can_resize设为假，避免执行自然rehash，从而减少程序对内存的触碰（touch）。当持久化任务完成之后，dict_can_resize会重新被设为真。另一方面，当字典满足了强制rehash的条件时，即使dict_can_resize不为真（有BGSAVE或BGREWRITEAOF正在执行），这个字典一样会被rehash。
 
+## skiplist（zset使用）
+跳跃表（skiplist）是一种随机化的数据，由William Pugh在论文《Skip lists: a probabilisticalternative to balanced trees》中提出，这种数据结构以有序的方式在层次化的链表中保存元素，它的效率可以和平衡树媲美——查找、删除、添加等操作都可以在对数期望时间下完成，并且比起平衡树来说，跳跃表的实现要简单直观得多。
+
+跳跃表主要由以下部分构成：
+ •表头（head）：负责维护跳跃表的节点指针。
+ •跳跃表节点：保存着元素值，以及多个层。
+ •层：保存着指向其他元素的指针。高层的指针越过的元素数量大于等于低层的指针，为了提高查找的效率，程序总是从高层先开始访问，然后随着元素值范围的缩小，慢慢降低层次。
+ •表尾：全部由NULL组成，表示跳跃表的末尾。  
+因为跳跃表的定义可以在任何一本算法或数据结构的书中找到，所以本章不介绍跳跃表的具体实现方式或者具体的算法，而只介绍跳跃表在Redis的应用、核心数据结构和API。
+
+### 跳跃表的实现  
+为了适应自身的功能需要，Redis基于William Pugh论文中描述的跳跃表进行了以下修改：
+  1.允许重复的score值：多个不同的member的score值可以相同。
+  2.进行对比操作时，不仅要检查score值，还要检查member：当score值可以重复时，单靠score值无法判断一个元素的身份，所以需要连member域都一并检查才行。
+  3.每个节点都带有一个高度为1层的后退指针，用于从表尾方向向表头方向迭代：当执行ZREVRANGE或ZREVRANGEBYSCORE这类以逆序处理有序集的命令时，就会用到这个属性。
+
+#### 跳跃表定义
+这个修改版的跳跃表由redis.h/server.h结构定义：
+```
+/* ZSETs use a specialized version of Skiplists */
+typedef struct zskiplistNode {
+    sds ele;      //sds对象
+    double score; //分值
+    struct zskiplistNode *backward; //后退指针
+    struct zskiplistLevel {         //层
+        struct zskiplistNode *forward;  //前进节点
+        unsigned long span;             //这个层跨越的节点个数
+    } level[];
+} zskiplistNode;
+
+typedef struct zskiplist {
+    struct zskiplistNode *header, *tail;  //头尾节点
+    unsigned long length;  //节点个数
+    int level;             //目前表内节点的最大层数
+} zskiplist;
+
+typedef struct zset {
+    dict *dict;
+    zskiplist *zsl;
+} zset;
+```
+
+#### 跳跃表api
+![Skiplist_API_and_big_o](../../z_images/redis/big-o_for_skiplist_value.png)
+
+#### 跳跃表的应用
+和字典、链表或者字符串这几种在Redis中大量使用的数据结构不同，**跳跃表在Redis的唯一作用，就是实现有序集数据类型。**
+跳跃表将 **<u>指向有序集的score值和member域的指针作为元素，并以score值为索引，对有序集元素进行排序。</u>**
+举个例子，以下代码就创建了一个带有3个元素的有序集：  
+```
+redis>ZADD s 6 x 10 y 15 z
+(integer) 3
+```
+在底层实现中，Redis为x、y和z三个member分别创建了三个字符串，并为6、10和15分别创建三个double类型的值，然后用一个跳跃表将这些指针有序地保存起来，形成这样一个跳跃表：
+![ZSkiplist_举例](../../z_images/redis/zskiplist_example_1.png)  
+为了展示的方便，在图片中我们直接将member和score值包含在表节点中，但是在实际的定义中，因为跳跃表要和另一个实现有序集的结构（字典）分享member和score值，所以跳跃表只保存指向member和score的指针。  
+
+
+#### 跳跃表小结  
+•跳跃表是一种随机化数据结构，它的查找、添加、删除操作都可以在对数期望时间下完成。  
+•跳跃表目前在Redis的唯一作用就是作为有序集类型的底层数据结构（之一，另一个构成有序集的结构是字典）。  
+•为了适应自身的需求，Redis基于William Pugh论文中描述的跳跃表进行了修改，包括：  
+  1.score值可重复。  
+  2.对比一个元素需要同时检查它的score和memeber。  
+  3.每个节点带有高度为1层的后退指针，用于从表尾方向向表头方向迭代。  
+
 
 ## quicklist（list使用）
 
 ## ziplist(zset/hash/list内部元素个数小于512、128个&每个元素值小于64字节时使用)
 
-## skiplist（zset使用）
