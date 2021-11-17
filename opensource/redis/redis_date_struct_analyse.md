@@ -2,43 +2,50 @@
 <!-- TOC -->
 
 - [redis encoding type汇总](#redis-encoding-type汇总)
-- [SDS——简单动态字符串](#sds简单动态字符串)
-  - [sds的用途](#sds的用途)
-    - [实现字符串对像](#实现字符串对像)
-    - [Redis中的字符串](#redis中的字符串)
-  - [sds的实现](#sds的实现)
-    - [优化追加操作](#优化追加操作)
-    - [sds模块的API](#sds模块的api)
-  - [sds总结](#sds总结)
-- [linkedlist——双端链表](#linkedlist双端链表)
-  - [双端链表的应用](#双端链表的应用)
-    - [实现Redis的列表类型](#实现redis的列表类型)
-    - [Redis自身功能的构建](#redis自身功能的构建)
-  - [链表和链表节点定义](#链表和链表节点定义)
-  - [链表实现特点](#链表实现特点)
-  - [连表API及时间复杂度](#连表api及时间复杂度)
-- [hashtables（hash/set内部使用）](#hashtableshashset内部使用)
-  - [字典的应用](#字典的应用)
-    - [实现数据库键空间（key space）](#实现数据库键空间key-space)
-    - [用作Hash类型键的其中一种底层实现](#用作hash类型键的其中一种底层实现)
-  - [字典的定义](#字典的定义)
-  - [字典的方法](#字典的方法)
-  - [字典的剖析](#字典的剖析)
-- [skiplist（zset使用）](#skiplistzset使用)
-  - [跳跃表的实现](#跳跃表的实现)
-    - [跳跃表定义](#跳跃表定义)
-    - [跳跃表api](#跳跃表api)
-    - [跳跃表的应用](#跳跃表的应用)
-    - [跳跃表小结](#跳跃表小结)
-- [ziplist———压缩列表(zset/hash/list内部元素个数小于512、128个&每个元素值小于64字节时使用)](#ziplist压缩列表zsethashlist内部元素个数小于512128个每个元素值小于64字节时使用)
-  - [ziplist构成](#ziplist构成)
-  - [ziplist api接口](#ziplist-api接口)
-  - [ziplist中节点的构成](#ziplist中节点的构成)
-  - [ziplist 总结](#ziplist-总结)
-- [quicklist（list使用）](#quicklistlist使用)
+- [内部数据结构](#内部数据结构)
+  - [SDS——简单动态字符串](#sds简单动态字符串)
+    - [sds的用途](#sds的用途)
+      - [实现字符串对像](#实现字符串对像)
+      - [Redis中的字符串](#redis中的字符串)
+    - [sds的实现](#sds的实现)
+      - [优化追加操作](#优化追加操作)
+      - [sds模块的API](#sds模块的api)
+    - [sds总结](#sds总结)
+  - [linkedlist——双端链表](#linkedlist双端链表)
+    - [双端链表的应用](#双端链表的应用)
+      - [实现Redis的列表类型](#实现redis的列表类型)
+      - [Redis自身功能的构建](#redis自身功能的构建)
+    - [链表和链表节点定义](#链表和链表节点定义)
+    - [链表实现特点](#链表实现特点)
+    - [连表API及时间复杂度](#连表api及时间复杂度)
+  - [hashtables（hash/set内部使用）](#hashtableshashset内部使用)
+    - [字典的应用](#字典的应用)
+      - [实现数据库键空间（key space）](#实现数据库键空间key-space)
+      - [用作Hash类型键的其中一种底层实现](#用作hash类型键的其中一种底层实现)
+    - [字典的定义](#字典的定义)
+    - [字典的方法](#字典的方法)
+    - [字典的剖析](#字典的剖析)
+  - [skiplist（zset使用）](#skiplistzset使用)
+    - [跳跃表的实现](#跳跃表的实现)
+      - [跳跃表定义](#跳跃表定义)
+      - [跳跃表api](#跳跃表api)
+      - [跳跃表的应用](#跳跃表的应用)
+      - [跳跃表小结](#跳跃表小结)
+- [内存映射数据结构](#内存映射数据结构)
+  - [ziplist———压缩列表(zset/hash/list内部元素个数小于512、128个&每个元素值小于64字节时使用)](#ziplist压缩列表zsethashlist内部元素个数小于512128个每个元素值小于64字节时使用)
+    - [ziplist构成](#ziplist构成)
+    - [ziplist api接口](#ziplist-api接口)
+    - [ziplist中节点的构成](#ziplist中节点的构成)
+    - [ziplist 总结](#ziplist-总结)
+  - [整数集合（intset）](#整数集合intset)
+    - [整数集合的应用](#整数集合的应用)
+    - [intset定义](#intset定义)
+    - [intset api](#intset-api)
+    - [intset小结](#intset小结)
+  - [quicklist（list使用）](#quicklistlist使用)
 
 <!-- /TOC -->
-## redis encoding type汇总
+# redis encoding type汇总
 
 ![图2-2 Redis数据结构和内部编码](../../z_images/redis/redis_five_data_struct_and_econding.png)
 
@@ -57,6 +64,11 @@
 | set    | intset           | 当集合中的元素都是整数且元素个数小于set-max-intset-entries配置(默认512个)时                                                        |
 | zset   | skiplist         | 当ziplist条件不满足时                                                                                                              |
 | zset   | ziplist          | 有序集合的元素个数小于zset-max-ziplist-entries配置(默认128个)，同时每个元素的值都小于zset-max-ziplist-value配置(默认64字节)时      |
+
+
+# 内部数据结构  
+**Redis和其他很多key-value数据库的不同之处在于，Redis不仅支持简单的字符串键值对，它还提供了一系列数据结构类型值，比如列表、哈希、集合和有序集，并在这些数据结构类型上定义了一套强大的API。**  
+通过对不同类型的值进行操作，Redis可以很轻易地完成其他只支持字符串键值对的key-value数据库很难（或者无法）完成的任务。在Redis的内部，数据结构类型值由高效的数据结构和算法进行支持，并且在Redis自身的构建当中，也大量用到了这些数据结构。这一部分将对Redis内存所使用的数据结构和算法进行介绍。  
 
 ## SDS——简单动态字符串
 Sds（Simple Dynamic String，简单动态字符串）是Redis底层所使用的字符串表示，它被用在几乎所有的Redis模块中。本章将对sds的实现、性能和功能等方面进行介绍，并说明Redis使用sds而不是传统C字符串的原因。
@@ -394,6 +406,10 @@ redis>ZADD s 6 x 10 y 15 z
   2.对比一个元素需要同时检查它的score和memeber。  
   3.每个节点带有高度为1层的后退指针，用于从表尾方向向表头方向迭代。  
 
+
+# 内存映射数据结构
+**虽然内部数据结构非常强大，但是创建一系列完整的数据结构本身也是一件相当耗费内存的工作，当一个对象包含的元素数量并不多，或者元素本身的体积并不大时，使用代价高昂的内部数据结构并不是最好的办法。<u>为了解决这一问题，Redis在条件允许的情况下，会使用内存映射数据结构来代替内部数据结构。内存映射数据结构是一系列经过特殊编码的字节序列，创建它们所消耗的内存通常比作用类似的内部数据结构要少得多，如果使用得当，内存映射数据结构可以为用户节省大量的内存。不过，因为内存映射数据结构的编码和操作方式要比内部数据结构要复杂得多，所以内存映射数据结构所占用的CPU时间会比作用类似的内部数据结构要多。</u>这一部分将对Redis目前正在使用的两种内存映射数据结构进行介绍。**
+
 ## ziplist———压缩列表(zset/hash/list内部元素个数小于512、128个&每个元素值小于64字节时使用)
 **Ziplist是由一系列特殊编码的内存块构成的列表，一个ziplist可以包含多个节点（entry），每个节点可以保存一个长度受限的字符数组（不以\0结尾的char数组）或者整数，**包括：
  •字符数组
@@ -474,5 +490,66 @@ component   |pre_entry_length|encoding|length|content|
 ### ziplist 总结  
 添加和删除ziplist节点有可能会引起连锁更新，因此，添加和删除操作的最坏复杂度为O(N2)，不过，因为连锁更新的出现概率并不高，所以一般可以将添加和删除操作的复杂度视为O(N)。  
 
+## 整数集合（intset）  
+整数集合（intset）用于有序、无重复地保存多个整数值，它会根据元素的值，自动选择该用什么长度的整数类型来保存元素。举个例子，如果在一个intset里面，最长的元素可以用int16_t类型来保存，那么这个intset的所有元素都以int16_t类型来保存。另一方面，如果有一个新元素要加入到这个intset，并且这个元素不能用int16_t类型来保存——比如说，新元素的长度为int32_t，那么这个intset就会自动进行“升级”：先将集合中现有的所有元素从int16_t类型转换为int32_t类型，接着再将新元素加入到集合中。根据需要，intset可以自动从int16_t升级到int32_t或int64_t，或者从int32_t升级到int64_t。
+
+### 整数集合的应用
+Intset是集合键的底层实现之一，如果一个集合：  
+1.只保存着整数元素；  
+2.元素的数量不多；  
+那么Redis就会使用intset来保存集合元素。  
+
+### intset定义
+以下是intset.h/intset类型的定义：  
+```
+typedef struct intset {
+    // 编码方式
+    uint32_t encoding;
+
+    // 集合包含的元素数量
+    uint32_t length;
+
+    // 保存元素的数组
+    int8_t contents[];
+
+} intset;
+```
+encoding的值可以是以下三个常量的其中一个（定义位于intset.c）：  
+```
+#define INTSET_ENC_INT16 (sizeof(int16_t))  
+#define INTSET_ENC_INT32 (sizeof(int32_t))  
+#define INTSET_ENC_INT64 (sizeof(int64_t))  
+```
+contents数组是实际保存元素的地方，数组中的元素有以下两个特性：  
+  •没有重复元素；  
+  •元素在数组中从小到大排列；  
+contents数组的int8_t类型声明比较容易让人误解，实际上，intset并不使用int8_t类型来保存任何元素，结构中的这个类型声明只是作为一个占位符使用：在对contents中的元素进行读取或者写入时，程序并不是直接使用contents来对元素进行索引，而是根据encoding的值，对contents进行类型转换和指针运算，计算出元素在内存中的正确位置。在添加新元素，进行内存分配时，分配的容量也是由encoding的值决定。  
+
+### intset api
+下表列出了处理intset的一些主要操作，以及这些操作的算法复杂度：
+![intset api](../../z_images/redis/big-o_for_intset_value.png)  
+
+intset创建intset之后，就可以对它添加新元素了。添加新元素到intset的工作由intset.c/intsetAdd函数完成，它需要处理以下三种情况：  
+1.元素已存在于集合，不做动作；  
+2.元素不存在于集合，并且添加新元素并不需要升级；  
+3.元素不存在于集合，但是要在升级之后，才能添加新元素；  
+并且，intsetAdd需要维持intset->contents的以下性质：  
+1.确保数组中没有重复元素；  
+2.确保数组中的元素按从小到大排序；  
+
+关于intset内部主要支持如下操作：  
+1、升级：在添加新元素时，如果intsetAdd发现新元素不能用现有的编码方式来保存，它就会对contents进行升级；     
+2、元素移动：在进行升级的过程中，需要对数组内的元素进行“类型转换”和“移动”操作。其中，移动不仅出现在升级（intsetUpgradeAndAdd）操作中，还出现其他对contents数组内容进行增删的操作上，比如intsetAdd和intsetRemove，因为这种移动操作需要处理intset中的所有元素；    
+3、读取：有两种方式读取intset的元素，一种是_intsetGet，另一种是intsetSearch；  
+4、写入：除了前面介绍过的intsetAdd和intsetUpgradeAndAdd之外，_intsetSet也对集合进行写入操作：它接受一个索引pos，以及一个new_value，将contents数组pos位置的值设为new_value。  
+5、删除：删除单个元素的工作由intsetRemove操作，它先调用intsetSearch找到需要被删除的元素在contents数组中的索引，然后使用内存移位操作，将目标元素从内存中抹去，最后，通过内存重分配，对contents数组的长度进行调整。  
+6、降级：Intset不支持降级操作。Intset定位为一种受限的中间表示，只能保存整数值，而且元素的个数也不能超过redis.h/REDIS_SET_MAX_INTSET_ENTRIES（目前版本值为512）这些条件决定了它被保存的时间不会太长，因此对它进行太复杂的操作，没有必要。
+
+### intset小结  
+•Intset用于有序、无重复地保存多个整数值，它会根据元素的值，自动选择该用什么长度的整数类型来保存元素。  
+•当一个位长度更长的整数值添加到intset时，需要对intset进行升级，新intset中每个元素的位长度都等于新添加值的位长度，但原有元素的值不变。  
+•升级会引起整个intset进行内存重分配，并移动集合中的所有元素，这个操作的复杂度为O(N)。   
+•Intset只支持升级，不支持降级。  
+•Intset是有序的，程序使用二分查找算法来实现查找操作，复杂度为O(lgN)。  
 
 ## quicklist（list使用）
