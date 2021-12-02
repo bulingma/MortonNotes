@@ -1,17 +1,15 @@
 <!-- TOC -->
 
-- [一致性算法](#一致性算法)
-  - [1、Paxos算法](#1paxos算法)
-    - [1.1、Paxos算法背景](#11paxos算法背景)
-    - [1.2、Paxos算法流程](#12paxos算法流程)
-      - [1.2.1、Paxos系统中的角色](#121paxos系统中的角色)
-      - [1.2.2、Paxos算法决议通过的两个阶段](#122paxos算法决议通过的两个阶段)
-      - [1.2.3、Paxos问题](#123paxos问题)
-  - [2、Multi-Paxos算法](#2multi-paxos算法)
+- [1、Paxos算法](#1paxos算法)
+  - [1.1、Paxos算法背景](#11paxos算法背景)
+  - [1.2、Paxos算法流程](#12paxos算法流程)
+    - [1.2.1、Paxos系统中的角色](#121paxos系统中的角色)
+    - [1.2.2、Paxos算法决议通过的两个阶段](#122paxos算法决议通过的两个阶段)
+    - [1.2.3、Paxos问题](#123paxos问题)
+- [2、Multi-Paxos算法](#2multi-paxos算法)
 
 <!-- /TOC -->
 
-# 一致性算法
 ## 1、Paxos算法
 ### 1.1、Paxos算法背景
 Paxos算法是Lamport宗师提出的一种基于消息传递的<u>**分布式一致性算法**</u>，使其获得2013年图灵奖。
@@ -68,18 +66,17 @@ Paxos算法流程中的每条消息描述如下：
 
 <u> **Multi-Paxos基于Basic Paxos做了两点改进：**</u>   
 
-1、针对每一个要确定的值，运行一次Paxos算法实例（Instance），形成决议。每一个Paxos实例使用唯一的Instance ID标识。  
+1、<u> **针对每一个要确定的值，运行一次Paxos算法实例（Instance），形成决议。每一个Paxos实例使用唯一的Instance ID标识。**</u>    
 2、<u> **在所有Proposers中选举一个Leader，由Leader唯一地提交Proposal给Acceptors进行表决。这样没有Proposer竞争，解决了活锁问题。在系统中仅有一个Leader进行Value提交的情况下，Prepare阶段就可以跳过，从而将两阶段变为一阶段，提高效率。**</u> 
 
 <u> **Multi-Paxos首先需要选举Leader，Leader的确定也是一次决议的形成，所以可执行一次Basic Paxos实例来选举出一个Leader。选出Leader之后只能由Leader提交Proposal，在Leader宕机之后服务临时不可用，需要重新选举Leader继续服务。在系统中仅有一个Leader进行Proposal提交的情况下，Prepare阶段可以跳过。**</u> 
 
-Multi-Paxos通过改变Prepare阶段的作用范围至后面Leader提交的所有实例，从而使得Leader的连续提交只需要执行一次Prepare阶段，后续只需要执行Accept阶段，将两阶段变为一阶段，提高了效率。为了区分连续提交的多个实例，每个实例使用一个Instance ID标识，Instance ID由Leader本地递增生成即可。
+Multi-Paxos通过改变Prepare阶段的作用范围至后面Leader提交的所有实例，从而使得Leader的连续提交只需要执行一次Prepare阶段，后续只需要执行Accept阶段，将两阶段变为一阶段，提高了效率。**为了区分连续提交的多个实例，每个实例使用一个Instance ID标识，Instance ID由Leader本地递增生成即可**。
 
 Multi-Paxos允许有多个自认为是Leader的节点并发提交Proposal而不影响其安全性，这样的场景即退化为Basic Paxos。
-
 
 <u> **Chubby和Boxwood均使用Multi-Paxos。ZooKeeper使用的Zab也是Multi-Paxos的变形。**</u> 
 
 [Paxos Made Simple](https://lamport.azurewebsites.net/pubs/paxos-simple.pdf)  
-[Paxos算法详解](https://zhuanlan.zhihu.com/p/31780743)
+[Paxos算法详解](https://zhuanlan.zhihu.com/p/31780743)  
 [分布式系列文章——Paxos算法原理与推导 ](https://www.cnblogs.com/linbingdong/p/6253479.html)
