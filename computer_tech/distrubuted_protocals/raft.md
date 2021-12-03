@@ -25,6 +25,8 @@ Paxos算法详解一文讲述了晦涩难懂的Paxos算法，<u>**以可理解�
   AppendEntries(追加日志)  
 
 Raft数据写请求也是在leader的心跳中被带到follwer去的。
+Raft心跳随机追加等待时间为：150ms~300ms
+[raft一致性算法原理](https://www.bilibili.com/video/BV1eN411Z7KF?from=search&seid=10211459941544517006&spm_id_from=333.337.0.0)
 
 ### 3.1、Raft算法概述
 **不同于Paxos算法直接从分布式一致性问题出发推导出来，Raft算法则是从多副本状态机的角度提出，用于管理多副本状态机的日志复制。Raft实现了和Paxos相同的功能，它将一致性分解为多个<u>子问题：Leader选举（Leader election）、日志同步（Log replication）、安全性（Safety）、日志压缩（Log compaction）、成员变更（Membership change）等。**</u> 同时，Raft算法使用了更强的假设来减少了需要考虑的状态，使之变的易于理解和实现。
