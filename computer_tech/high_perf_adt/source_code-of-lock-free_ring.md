@@ -63,7 +63,7 @@ weak = false的时候，对应的是compare_exchange_strong函数。
 如果是x86平台，两者没区别  
 如果想在移值的时候，拿到高性能，用compare_exchange_weak。  
 
-[Built-in Functions for Memory Model Aware Atomic Operations](https://gcc.gnu.org/onlinedocs/gcc/_005f_005fatomic-Builtins.html)
+[Built-in Functions for Memory Model Aware Atomic Operations](https://gcc.gnu.org/onlinedocs/gcc/_005f_005fatomic-Builtins.html)  
 [c++并发编程3. CAS原语](https://zhuanlan.zhihu.com/p/56055215)
 
 

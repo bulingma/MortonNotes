@@ -1,15 +1,30 @@
 <!-- TOC -->
 
 - [3、Raft算法](#3raft算法)
+  - [3.0、Raft算法重点总结](#30raft算法重点总结)
   - [3.1、Raft算法概述](#31raft算法概述)
   - [3.2、Leader选举](#32leader选举)
   - [3.3、日志同步](#33日志同步)
   - [3.4、安全性](#34安全性)
   - [3.5、日志压缩](#35日志压缩)
+  - [3.6、成员变更](#36成员变更)
+  - [3.7、Raft与Multi-Paxos的异同](#37raft与multi-paxos的异同)
 
 <!-- /TOC -->
 ## 3、Raft算法
 Paxos算法详解一文讲述了晦涩难懂的Paxos算法，<u>**以可理解性和易于实现为目标的Raft算法**</u>极大的帮助了我们的理解，推动了分布式一致性算法的工程应用。
+
+### 3.0、Raft算法重点总结
+* 三种角色：
+  Follower（追随者）
+  Candidate（候选人——追随者抢主时的中间状态）
+  Leader（领导者）
+
+* 两种RPCs请求：   
+  RequestVote(请求投票)
+  AppendEntries(追加日志)  
+
+Raft数据写请求也是在leader的心跳中被带到follwer去的。
 
 ### 3.1、Raft算法概述
 **不同于Paxos算法直接从分布式一致性问题出发推导出来，Raft算法则是从多副本状态机的角度提出，用于管理多副本状态机的日志复制。Raft实现了和Paxos相同的功能，它将一致性分解为多个<u>子问题：Leader选举（Leader election）、日志同步（Log replication）、安全性（Safety）、日志压缩（Log compaction）、成员变更（Membership change）等。**</u> 同时，Raft算法使用了更强的假设来减少了需要考虑的状态，使之变的易于理解和实现。
@@ -75,5 +90,49 @@ Raft增加了如下两条限制以保证安全性：
 见原文解释  
 
 ### 3.5、日志压缩
+在实际的系统中，不能让日志无限增长，否则系统重启时需要花很长的时间进行回放，从而影响可用性。Raft采用对整个系统进行snapshot来解决，snapshot之前的日志都可以丢弃。
 
-[Raft算法详解](https://zhuanlan.zhihu.com/p/32052223)
+每个副本独立的对自己的系统状态进行snapshot，并且只能对已经提交的日志记录进行snapshot。
+
+Snapshot中包含以下内容：
+
+日志元数据。最后一条已提交的 log entry的 log index和term。这两个值在snapshot之后的第一条log entry的AppendEntries RPC的完整性检查的时候会被用上。
+系统当前状态。
+当Leader要发给某个日志落后太多的Follower的log entry被丢弃，Leader会将snapshot发给Follower。或者当新加进一台机器时，也会发送snapshot给它。发送snapshot使用InstalledSnapshot RPC（RPC细节参见八、Raft算法总结）。
+
+做snapshot既不要做的太频繁，否则消耗磁盘带宽， 也不要做的太不频繁，否则一旦节点重启需要回放大量日志，影响可用性。推荐当日志达到某个固定的大小做一次snapshot。
+
+做一次snapshot可能耗时过长，会影响正常日志同步。可以通过使用copy-on-write技术避免snapshot过程影响正常日志同步。
+
+### 3.6、成员变更
+
+成员变更是在集群运行过程中副本发生变化，如增加/减少副本数、节点替换等。
+
+成员变更也是一个分布式一致性问题，既所有服务器对新成员达成一致。但是成员变更又有其特殊性，因为在成员变更的一致性达成的过程中，参与投票的进程会发生变化。
+
+如果将成员变更当成一般的一致性问题，直接向Leader发送成员变更请求，Leader复制成员变更日志，达成多数派之后提交，各服务器提交成员变更日志后从旧成员配置（Cold）切换到新成员配置（Cnew）。
+
+因为各个服务器提交成员变更日志的时刻可能不同，造成各个服务器从旧成员配置（Cold）切换到新成员配置（Cnew）的时刻不同。
+
+成员变更不能影响服务的可用性，但是成员变更过程的某一时刻，可能出现在Cold和Cnew中同时存在两个不相交的多数派，进而可能选出两个Leader，形成不同的决议，破坏安全性。
+
+由于成员变更的这一特殊性，成员变更不能当成一般的一致性问题去解决。
+
+为了解决这一问题，Raft提出了两阶段的成员变更方法。集群先从旧成员配置Cold切换到一个过渡成员配置，称为共同一致（joint consensus），共同一致是旧成员配置Cold和新成员配置Cnew的组合Cold U Cnew，一旦共同一致Cold U Cnew被提交，系统再切换到新成员配置Cnew。  
+见原文  
+
+
+### 3.7、Raft与Multi-Paxos的异同  
+Raft与Multi-Paxos都是基于领导者的一致性算法，乍一看有很多地方相同，下面总结一下Raft与Multi-Paxos的异同。  
+
+Raft与Multi-Paxos中相似的概念：     
+![diff_of_raft_and_paxos](../../z_images/consensus_algorithm/diff_of_raft_and_paxos.png)  
+
+
+Raft与Multi-Paxos的不同：  
+![same_of_raft_and_paxos](../../z_images/consensus_algorithm/same_of_raft_and_paxos.png)  
+
+
+
+[Raft算法详解](https://zhuanlan.zhihu.com/p/32052223)  
+[In Search of an Understandable Consensus Algorithm (Extended Version)](https://raft.github.io/raft.pdf)
