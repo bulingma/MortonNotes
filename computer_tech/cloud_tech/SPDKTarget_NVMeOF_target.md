@@ -17,6 +17,6 @@ The specification refers to the "client" that connects to the target as a "host"
 The Linux kernel also implements an NVMe-oF target and host, and SPDK is tested for interoperability with the Linux kernel implementations.
 
 ## Both the Linux kernel and SPDK implement an NVMe over Fabrics host.
-当前我司的nvmf的host是采用的linux kernel提供的driver支持，因为spdk提供的用户态host driver打开block设备和chunk打开nvme本地盘的方法一样，公司里面除了我们其他人也不会用，难以维护，所以采用内核提供的host访问后端nvmf target。
+当前我们的nvmf的host是采用的linux kernel提供的driver支持，因为spdk提供的用户态host driver打开block设备和chunk打开nvme本地盘的方法一样，公司里面除了我们其他人也不会用，难以维护，所以采用内核提供的host访问后端nvmf target。
 
 [nvmf](https://spdk.io/doc/nvmf.html)

@@ -1,7 +1,7 @@
 ## 前言  
 内存管理是C++中的一个常见的错误和bug来源。在大部分情形中，这些bug来自动态分配内存和指针的使用：当多次释放动态分配的内存时，可能会导致内存损坏或者致命的运行时错误；当忘记释放动态分配的内存时，会导致内存泄露。所以，我们需要智能指针来帮助我们管理动态分配的内存。其来源于一个事实：栈比堆要安全的多，因为栈上的变量离开作用域后，会自动销毁并清理。智能指针结合了栈上变量的安全性和堆上变量的灵活性。
 ## 引言  
-```
+```cpp
 void someFunction()
 {
     Resource* ptr = new Resource; // Resource是一个类或者结构
@@ -11,7 +11,7 @@ void someFunction()
 }
 ```
 代码很简单：申请了一份动态内存，使用之后释放了它。但是我们很容易会在函数结束前释放它。也许我们记得及时释放动态申请的内存，但是仍然有一些不可抗力导致内存无法得到释放，比如函数提前终止了。考虑下面的代码：  
-```
+```cpp
 void someFunction()
 {
     Resource* ptr = new Resource; // Resource是一个类或者结构
@@ -32,7 +32,7 @@ void someFunction()
 
 此时，由于过早的return语句以及异常的抛出，ptr将得不到正确释放，从而出现内存泄露。归根到底，指针并没有一个内在机制来自动管理与释放。然后，你可能想到了类：类内部存储指针，然后在析构函数中销毁该指针。类可以实现资源的自动管理。其好处是，只要类局部变量（分配在栈上）超出其作用域（不论其是如何离开的），其析构函数一定会被执行，那么管理的内存也将一定得到销毁。基于这样的想法，我们实现了一个简单的智能指针类：  
 
-```
+```cpp
 template<typename T>
 class Auto_ptr2{
 public:
@@ -66,7 +66,7 @@ private:
 };
 ```
 我们使用这个新类测试一下下面的代码：
-```
+```cpp
 int main()
 {
     Auto_ptr2<Resource> res1(new Resource);
@@ -87,7 +87,7 @@ int main()
 }
 ```
 执行上面的程序，我们可以得到下面的输出：
-```
+```cpp
 Resource acquired
 res1 is not null
 res2 is null
@@ -101,7 +101,7 @@ Resource destroyed
 如果你仔细审视Auto_ptr2，<u>**你会发现其实际上实现的是移动语义，对于移动语义来说，其将转移对象所有权，而不是进行赋值。**</u> 由于在C++11之前，并没有右值引用，所以没有机制实现移动语义。所以C++11之前的智能指针是std::auto_ptr，其实现就类似于Auto_ptr2类。但是其存在很多问题。首先如果函数中存在std::auto_ptr类型的参数，你使用一个变量进行传值时，资源所有权将会被转移，那么函数结束后资源将被销毁，然后你可能解引用这个变量，但实际上它已经是空指针了，因此程序可能崩溃。其次，std::auto_ptr内部调用的是非数组delete，那么对于动态分配的数组，std::auto_ptr无法正常工作，可能会出现内存泄露。最后，std::auto_ptr对STL不兼容，因为STL的对象在进行复制时，就是进行复制，而不是移动语义。所以实际上，在std::auto_ptr在C++11中已经被弃用了，并且在C++17中被移除标准库。
 
 基于C++11中的右值引用与移动语义，我们可以解决上面出现的大部分问题：
-```
+```cpp
 template<typename T>
 class Auto_ptr3
 {
@@ -145,7 +145,7 @@ private:
 
 ## unique_ptr
 std::unique_ptr是std::auto_ptr的替代品，其用于不能被多个实例共享的内存管理。这就是说，仅有一个实例拥有内存所有权。它的使用很简单：
-```
+```cpp
 class Fraction
 {
 private:
@@ -186,7 +186,7 @@ int main()
 }
 ```
 如果编译器支持，尽量使用make_unique函数创建unique_ptr实例，如果不支持，你可以实现简化的版本：
-```
+```cpp
 // 注意：无法处理数组
 template<typename T, typename ... Ts>
 std::unique_ptr<T> make_unique(Ts ... args)
@@ -195,7 +195,7 @@ std::unique_ptr<T> make_unique(Ts ... args)
 }
 ```
 可以看到，std::unique_ptr对象可以作为函数返回值使用，因为函数返回值是个右值，复制给其他变量时，通过移动语义来实现。当然，你可以将std::unique_ptr对象传递给函数，看下面的例子：
-```
+```cpp
 class Resource
 {
 public:
@@ -231,7 +231,7 @@ int main()
 }
 ```
 可以看到std::unique_ptr对象可以传值给左值常量引用参数，因为这并不会改变内存所有权。也可以右值传值，实现移动语义：
-```
+```cpp
 void takeOwnerShip(std::unique_ptr<Resource>&& res) // 也可以用 std::unique_ptr<Resource> res{
     if (res){
         cout << *res;
@@ -257,7 +257,7 @@ int main(){
 可以看到，std::unique_ptr对象可以方便地管理动态内存。但是前提是该对象是建立在栈上的，千万不要使用动态分配的类对象，那么将在堆上，其行为与普通指针变得一样。
 
 使用std::unique_ptr可能犯的两个错误是：
-```
+```cpp
 // 千万不要用同一个资源来初始化多个std::unique_ptr对象
 Resource *res = new Resource;
 std::unique_ptr<Resource> res1(res);
@@ -270,7 +270,7 @@ delete res;
 ```
 
 std::unique_ptr默认使用new和delete运算符来分配和释放内存，可以修改这个行为，下面的代码使用malloc()和free()函数管理资源：
-```
+```cpp
 // 大部分时候没有理由这样做
 auto deleter = [](int* p) { free(p); };
 int* p = (int*)malloc(sizeof(int));
@@ -285,7 +285,7 @@ std::unique_ptr还有几个常用的方法： 1. release()：返回该对象所�
 ## shard_ptr
 std::shared_ptr与std::unique_ptr类似。要创建std::shared_ptr对象，可以使用make_shared()函数（C++11是支持的，貌似制定这个标准的人忘了make_unique()，所以在C++14追加了）。  
 <u>**std::shared_ptr与std::unique_ptr的主要区别在于前者是使用引用计数的智能指针。引用计数的智能指针可以跟踪引用同一个真实指针对象的智能指针实例的数目。这意味着，可以有多个std::shared_ptr实例可以指向同一块动态分配的内存，当最后一个引用对象离开其作用域时，才会释放这块内存。**</u>还有一个区别是std::shared_ptr不能用于管理C语言风格的动态数组，这点要注意。下面看例子：
-```
+```cpp
 int main()
 {
     auto ptr1 = std::make_shared<Resource>();
@@ -306,7 +306,7 @@ int main()
 }
 ```
 可以看到，通过复制构造函数或者赋值来共享内存，知道这一点很重要，看下面的例子：
-```
+```cpp
 int main()
 {
     Resource* res = new Resource;
@@ -333,7 +333,7 @@ std::shared_ptr还有其他方法，更多的信息在这里[std::shared_ptr](ht
 
 ## weak_ptr  
 std::shared_ptr可以实现多个对象共享同一块内存，当最后一个对象离开其作用域时，这块内存被释放。但是仍然有可能出现内存无法被释放的情况，联想一下“死锁”现象，对于std::shared_ptr会出现类似的“循环引用”现象：
-```
+```cpp
 class Person
 {
 public:
@@ -375,13 +375,13 @@ int main()
 }
 ```
 整个程序很简单，创建两个Person动态对象，交由智能指针管理，并且通过partnerUp()函数互相引用为自己的伙伴。但是执行的结果却却有问题：
-```
+```cpp
 Lucy created
 Ricky created
 Lucy is now partnered with Ricky
 ```
 对象没有被析构！出现内存泄露！仔细想想std::shared_ptr对象是什么时候才能被析构，就是引用计数变为0时，但是当你想析构p1时，p2内部却引用了p1，无法析构；反过来也无法析构。互相引用造成了“死锁”，最终内存泄露！这样的情形也会出现在“自锁”中：
-```
+```cpp
 int main()
 {
     {
@@ -394,7 +394,7 @@ int main()
 }
 ```
 <u>**这时候std::weak_ptr应运而生。std::weak_ptr可以包含由std::shared_ptr所管理的内存的引用。但是它仅仅是旁观者，并不是所有者。那就是std::weak_ptr不拥有这块内存，当然不会计数，也不会阻止std::shared_ptr释放其内存。**</u>但是它可以通过lock()方法返回一个std::shared_ptr对象，从而访问这块内存。这样我们可以用std::weak_ptr来解决上面的“循环引用”问题：  
-```
+```cpp
 class Person
 {
 public:
@@ -436,7 +436,7 @@ int main()
 }
 ```
 程序正常输出（注意创建与析构的顺序是反的？在栈上！）：  
-```
+```cpp
 Lucy created
 Ricky created
 Lucy is now partnered with Ricky
