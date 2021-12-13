@@ -1,9 +1,12 @@
-<!-- TOC -->
 
-- [Effective C++](#effective-c)
-- [More Effective c++](#more-effective-c)
 
-<!-- /TOC -->
+## 目录
+
+- [目录](#目录)
+  - [Effective C++](#effective-c)
+  - [More Effective C++](#more-effective-c)
+
+<a id="cc"></a>
 
 ### Effective C++
 
@@ -63,7 +66,8 @@
 54. 让自己熟悉包括 TR1 在内的标准程序库（TR1，C++ Technical Report 1，C++11 标准的草稿文件）
 55. 让自己熟悉 Boost（准标准库）
 
-### More Effective c++
+
+### More Effective C++
 
 1. 仔细区别 pointers 和 references（当你知道你需要指向某个东西，而且绝不会改变指向其他东西，或是当你实现一个操作符而其语法需求无法由 pointers 达成，你就应该选择 references；任何其他时候，请采用 pointers）
 2. 最好使用 C++ 转型操作符（`static_cast`、`const_cast`、`dynamic_cast`、`reinterpret_cast`）
