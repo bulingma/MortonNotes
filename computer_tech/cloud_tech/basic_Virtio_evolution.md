@@ -65,7 +65,7 @@ virtio标准将其对于队列的抽象称为Virtqueue。Vring即是对Virtqueue
 举例来说，**当virtio-net驱动发送网络数据包时流程**如下：
 
 ```
-1、virtio-net驱动会将数据放置于Available Ring中之后，会触发一次通知（Notification）（virtio-net驱动 Notificates kvm）
+1、virtio-net驱动会将数据放置于Available Ring中之后，会触发一次通知（Notification）（virtio-net驱动 Notificates kvm，目的是通知Qemu处理Available Ring中的数据）
 2、这时QEMU(QEMU在用户态，kvm在内核态，他们之间怎么通信？)会接管控制，将此网络包传递到TAP设备（tap设备在内核态，什么是tap设备？）。接着QEMU将数据放于Used Ring中，并发出一次通知，这次通知会触发虚拟中断的注入。
 3、虚拟机收到这个中断后，就会到Used Ring中取得后端已经放置的数据。至此一次发送操作就完成了。
 ```
@@ -158,7 +158,7 @@ snabbswitch主要使用了下面的技术来提高性能
 | ---------------- | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ | ----------------------------------------------------------------------- | ------------------------------------------------------------------------ |
 | Virtio-net       | Qume   | virtio-net driver处于vm的内核态，virtio-net device由Qemu实现(Qemu处于Host用户空间)，两者在控制面通过PCI协议通信，目的是确保Vring能够用于前后端正常通信，并且配置好自定义的设备特性 | notification vmexit & cCPU irq                                     | 同在Qemu进程内部，进程内通信                                            | 需要从内核态切换到用户空间的virtio-net device去                          |
 | Vhost(Vhost-net) | 内核   | virtio-net driver处于vm的内核态，virtio-net device由Qemu实现(Qemu处于Host用户空间)，两者在控制面通过PCI协议通信，目的是确保Vring能够用于前后端正常通信，并且配置好自定义的设备特性 | Notificates eventfd & irqfd                                        | Vhost协议通过对vhost-net字符设备进行ioctl实现，使用ioctl来交换vhost消息 | 同在内核态，进程内通信                                                   | 同在内核态空间，不需要切换 |
-| Vhost-user       | SPDK   | virtio-net driver处于vm的内核态，virtio-net device（dpdk中也叫virtio-device model）由Qemu实现(Qemu处于Host用户空间)，两者在控制面通过PCI协议通信                                   | 待求证                                                             | vhost-user协议则通过unix socket进行实现设备发现                         | 需要从内核态切换到DPDK APP用户空间，通过call(irqfd)和kick(ioeventfd)实现 |
+| Vhost-user       | SPDK   | virtio-net driver处于vm的内核态，virtio-net device（dpdk中也叫virtio-device model）由Qemu实现(Qemu处于Host用户空间)，两者在控制面通过PCI协议通信                                   | Notificates eventfd & irqfd                                        | vhost-user协议则通过unix socket进行实现设备发现                         | 需要从内核态切换到DPDK APP用户空间，通过call(irqfd)和kick(ioeventfd)实现 |
 
 
 #### 4.5、vDPA:使用硬件加速数据面
