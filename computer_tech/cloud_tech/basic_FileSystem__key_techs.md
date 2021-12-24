@@ -1,5 +1,20 @@
 
+<!-- TOC -->
 
+- [如何使用文件系统](#如何使用文件系统)
+- [现有文件系统有哪些](#现有文件系统有哪些)
+  - [NTFS](#ntfs)
+  - [XFS](#xfs)
+    - [分配组（Allocation Group）](#分配组allocation-group)
+      - [超级块（superblock）](#超级块superblock)
+      - [空闲块信息（AG free block info）](#空闲块信息ag-free-block-info)
+      - [Inode B+树信息](#inode-b树信息)
+  - [ExtN](#extn)
+  - [Btrfs](#btrfs)
+  - [ZFS](#zfs)
+  - [VFS](#vfs)
+
+<!-- /TOC -->
 
 TB（Terabyte），1 TB = 1024 GB；
 PB（Petabyte），1 PB = 1024 TB；
