@@ -1,20 +1,21 @@
 <!-- TOC -->
 
-- [3、Raft算法](#3raft算法)
-  - [3.0、Raft算法重点总结](#30raft算法重点总结)
-  - [3.1、Raft算法概述](#31raft算法概述)
-  - [3.2、Leader选举](#32leader选举)
-  - [3.3、日志同步](#33日志同步)
-  - [3.4、安全性](#34安全性)
-  - [3.5、日志压缩](#35日志压缩)
-  - [3.6、成员变更](#36成员变更)
-  - [3.7、Raft与Multi-Paxos的异同](#37raft与multi-paxos的异同)
+- [Raft算法详细介绍](#raft算法详细介绍)
+  - [Raft算法重点总结](#raft算法重点总结)
+  - [Raft算法概述](#raft算法概述)
+  - [Raft对一致性的拆解](#raft对一致性的拆解)
+    - [Leader election](#leader-election)
+    - [Log replication](#log-replication)
+    - [Safty](#safty)
+    - [Log compaction](#log-compaction)
+    - [Membership change](#membership-change)
+  - [Raft与Multi-Paxos的异同](#raft与multi-paxos的异同)
 
 <!-- /TOC -->
-## 3、Raft算法
+## Raft算法详细介绍
 Paxos算法详解一文讲述了晦涩难懂的Paxos算法，<u>**以可理解性和易于实现为目标的Raft算法**</u>极大的帮助了我们的理解，推动了分布式一致性算法的工程应用。
 
-### 3.0、Raft算法重点总结
+### Raft算法重点总结
 * 三种角色：
   Follower（追随者）
   Candidate（候选人——追随者抢主时的中间状态）
@@ -28,7 +29,7 @@ Raft数据写请求也是在leader的心跳中被带到follwer去的。
 Raft心跳随机追加等待时间为：150ms~300ms
 [raft一致性算法原理](https://www.bilibili.com/video/BV1eN411Z7KF?from=search&seid=10211459941544517006&spm_id_from=333.337.0.0)
 
-### 3.1、Raft算法概述
+### Raft算法概述
 **不同于Paxos算法直接从分布式一致性问题出发推导出来，Raft算法则是从多副本状态机的角度提出，用于管理多副本状态机的日志复制。Raft实现了和Paxos相同的功能，它将一致性分解为多个<u>子问题：Leader选举（Leader election）、日志同步（Log replication）、安全性（Safety）、日志压缩（Log compaction）、成员变更（Membership change）等。**</u> 同时，Raft算法使用了更强的假设来减少了需要考虑的状态，使之变的易于理解和实现。
 
 Raft将系统中的角色分为领导者（Leader）、跟从者（Follower）和候选人（Candidate）：
@@ -43,7 +44,8 @@ Follower只响应其他服务器的请求。如果Follower超时没有收到Lead
 
 Raft算法将时间分为一个个的任期（term），每一个term的开始都是Leader选举。在成功选举Leader之后，Leader会在整个term内管理整个集群。如果Leader选举失败，该term就会因为没有Leader而结束。
 
-### 3.2、Leader选举  
+### Raft对一致性的拆解
+#### Leader election 
 Raft 使用心跳（heartbeat）触发Leader选举。当服务器启动时，初始化为Follower。Leader向所有Followers周期性发送heartbeat。如果Follower在选举超时时间内没有收到Leader的heartbeat，就会等待一段随机的时间后发起一次Leader选举。
 
 Follower将其当前term加一然后转换为Candidate。它首先给自己投票并且给集群中的其他服务器发送 RequestVote RPC （RPC细节参见八、Raft算法总结）。结果有以下三种情况：
@@ -56,7 +58,7 @@ Follower将其当前term加一然后转换为Candidate。它首先给自己投�
 
 Raft保证选举出的Leader上一定具有最新的已提交的日志，这一点将在四、安全性中说明。
 
-### 3.3、日志同步
+#### Log replication
 Leader选出后，就开始接收客户端的请求。Leader把请求作为日志条目（Log entries）加入到它的日志中，然后并行的向其他服务器发起 AppendEntries RPC （RPC细节参见八、Raft算法总结）复制日志条目。当这条日志被复制到大多数服务器上，Leader将这条日志应用到它的状态机并向客户端返回执行结果。  
 
 某些Followers可能没有成功的复制日志，Leader会无限的重试 AppendEntries RPC直到所有的Followers最终存储了所有的日志条目。
@@ -83,7 +85,7 @@ Leader通过强制Followers复制它的日志来处理日志的不一致，Follo
 **Leader为了使Followers的日志同自己的一致，Leader需要找到Followers同它的日志一致的地方，然后覆盖Followers在该位置之后的条目。  
 Leader会从后往前试，每次AppendEntries失败后尝试前一个日志条目，直到成功找到每个Follower的日志一致位点，然后向后逐条覆盖Followers在该位置之后的条目。**
 
-### 3.4、安全性  
+#### Safty  
 Raft增加了如下两条限制以保证安全性：  
  * 拥有最新的已提交的log entry的Follower才有资格成为Leader。  
 这个保证是在RequestVote RPC中做的，Candidate在发送RequestVote RPC时，要带上自己的最后一条日志的term和log index，其他节点收到消息时，如果发现自己的日志比请求中携带的更新，则拒绝投票。日志比较的原则是，如果本地的最后一条log entry的term更大，则term大的更新，如果term一样大，则log index更大的更新。  
@@ -91,7 +93,7 @@ Raft增加了如下两条限制以保证安全性：
  * Leader只能推进commit index来提交当前term的已经复制到大多数服务器上的日志，旧term日志的提交要等到提交当前term的日志来间接提交（log index 小于 commit index的日志被间接提交）。    
 见原文解释  
 
-### 3.5、日志压缩
+#### Log compaction
 在实际的系统中，不能让日志无限增长，否则系统重启时需要花很长的时间进行回放，从而影响可用性。Raft采用对整个系统进行snapshot来解决，snapshot之前的日志都可以丢弃。
 
 每个副本独立的对自己的系统状态进行snapshot，并且只能对已经提交的日志记录进行snapshot。
@@ -106,7 +108,7 @@ Snapshot中包含以下内容：
 
 做一次snapshot可能耗时过长，会影响正常日志同步。可以通过使用copy-on-write技术避免snapshot过程影响正常日志同步。
 
-### 3.6、成员变更
+#### Membership change
 
 成员变更是在集群运行过程中副本发生变化，如增加/减少副本数、节点替换等。
 
@@ -124,7 +126,7 @@ Snapshot中包含以下内容：
 见原文  
 
 
-### 3.7、Raft与Multi-Paxos的异同  
+### Raft与Multi-Paxos的异同  
 Raft与Multi-Paxos都是基于领导者的一致性算法，乍一看有很多地方相同，下面总结一下Raft与Multi-Paxos的异同。  
 
 Raft与Multi-Paxos中相似的概念：     
