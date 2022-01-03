@@ -1,4 +1,23 @@
 
+<!-- TOC -->
+
+- [1、简单工厂模式](#1简单工厂模式)
+  - [1.1. 设计思路](#11-设计思路)
+  - [1.2. 结构图](#12-结构图)
+  - [1.3. 代码](#13-代码)
+- [2、工厂方法模式](#2工厂方法模式)
+  - [2.1. 设计思路](#21-设计思路)
+  - [2.2. 结构图](#22-结构图)
+  - [2.3. 代码](#23-代码)
+- [3、抽象工厂模式](#3抽象工厂模式)
+  - [3.1. 设计思路](#31-设计思路)
+  - [3.2. 结构图](#32-结构图)
+  - [3.3. 代码](#33-代码)
+- [4、参考资料](#4参考资料)
+
+<!-- /TOC -->
+
+
 ## 1、简单工厂模式
 
 ### 1.1. 设计思路    
@@ -13,7 +32,7 @@
 ![simple_factory_utl](../../z_images/design_partern/../../MortonNotes/z_images/design_partern/simple_factory_utl.jpeg)
 
 ### 1.3. 代码
-```
+```cpp
 _______________________________________________________________________________________
 // 工厂
 class Factory
@@ -101,7 +120,7 @@ int main()
 ### 2.2. 结构图   
 ![simple_factofactory_func](../../z_images/design_partern/../../MortonNotes/z_images/design_partern/factory_func.jpeg)
 ### 2.3. 代码  
-```
+```cpp
 ___________________________________________________
 // 汽车接口
 class ICar
@@ -195,7 +214,7 @@ int main()
 ![abstract_factory](../../z_images/design_partern/../../MortonNotes/z_images/design_partern/abstract_factory.jpeg)
 
 ### 3.3. 代码
-```
+```cpp
 _________________________________________
 // 抽象工厂 
 class AFactory

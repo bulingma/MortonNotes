@@ -2,7 +2,7 @@ IO-Multiplex 在不同的操作系统下有不同的推荐实现，最通用的 
 
 
 ## 0. reactor的代码模型
-```
+```cpp
 while(1){
     // poll模型
     int numEvents = ::poll(&*pollfds_.begin(), pollfds_.size(), timeoutMs);

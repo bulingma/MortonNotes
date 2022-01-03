@@ -628,11 +628,11 @@ int main()
 
 在STL中，**容器分为两类：序列式容器和关联式容器。**
 
-**序列式容器，其中的元素不一定有序，但都可以被排序。**  
+<u>**序列式容器，其中的元素不一定有序，但都可以被排序。**</u>   
 
 如：vector、list、deque、stack、queue、heap、priority_queue、slist；
 
-**关联式容器，内部结构基本上是一颗平衡二叉树。所谓关联，指每个元素都有一个键值和一个实值，元素按照一定的规则存放。**  
+<u>**关联式容器，内部结构基本上是一颗平衡二叉树。所谓关联，指每个元素都有一个键值和一个实值，元素按照一定的规则存放。**</u>  
 
 如：RB-tree、set、map、multiset、multimap、hashtable、hash_set、hash_map、hash_multiset、hash_multimap。
 

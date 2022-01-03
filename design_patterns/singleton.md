@@ -24,7 +24,7 @@
 单例实例在第一次被使用时才进行初始化，这叫做延迟初始化。
 
 ### 2.1. 双检测锁版本（Double-Checked Locking Pattern）  
-```
+```cpp
 // version 1.1
 class Singleton
 {
@@ -63,14 +63,14 @@ Singleton* Singleton::instance = NULL;
 
 * 双检测锁模式（DCL: Double-Checked Locking Pattern）缺点：  
 1、 在单例类内再定义一个嵌套类（Deletor），总是感觉很麻烦；   
-2、在某些内存模型中（虽然不常见）或者是由于编译器的优化以及运行时优化等等原因，使得instance虽然已经不是nullptr但是其所指对象还没有完成构造，这种情况下，另一个线程如果调用getInstance()就有可能使用到一个不完全初始化的对象。  
+2、 在某些内存模型中（虽然不常见）或者是由于编译器的优化以及运行时优化等等原因，使得instance虽然已经不是nullptr但是其所指对象还没有完成构造，这种情况下，另一个线程如果调用getInstance()就有可能使用到一个不完全初始化的对象。  
 
 ### 2.2. 局部静态变量版本（Meyers' Singleton）(重点掌握)
 C++11规定了local static在多线程条件下的初始化行为，要求编译器保证了内部静态变量的线程安全性。  
 在C++11标准下，《Effective C++》提出了一种更优雅的单例模式实现，使用函数内的 local static 对象。  
 这样，只有当第一次访问getInstance()方法时才创建实例。这种方法也被称为Meyers' Singleton。C++0x之后该实现是线程安全的，C++0x之前仍需加锁。 
 
-```
+```cpp
 // version 1.2
 class Singleton{
     private:
@@ -89,7 +89,7 @@ class Singleton{
 
 ## 3. 饿汉版（Eager Singleton）
 指单例实例在程序运行时被立即执行初始化  
-```
+```cpp
 // version 1.3
 class Singleton
 {
@@ -113,8 +113,8 @@ Singleton Singleton::instance;
 
 ## 4、总结
 Eager Singleton 虽然是线程安全的，但存在潜在问题；  
-Lazy Singleton通常需要加锁来保证线程安全，但局部静态变量版本在C++11后是线程安全的；  
-局部静态变量版本（Meyers Singleton）最优雅。  
+Lazy Singleton 通常需要加锁来保证线程安全，但局部静态变量版本在C++11后是线程安全的；  
+<u>局部静态变量版本（Meyers Singleton）最优雅。</u>  
 
 
 

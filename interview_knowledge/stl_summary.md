@@ -17,6 +17,10 @@
   - [multiset](#multiset)
   - [map](#map)
   - [multimap](#multimap)
+- [STL面试题汇总](#stl面试题汇总)
+  - [STL的六大组件](#stl的六大组件)
+  - [容器分类介绍](#容器分类介绍)
+  - [迭代器失效](#迭代器失效)
 
 <!-- /TOC -->
 
@@ -99,7 +103,7 @@ deque（['dek]）（双端队列）是double-ended queue 的一个不规则缩�
 
 因此，它们提供了类似于vector的功能，但是在序列的开始部分也可以高效地插入和删除元素，而不仅仅是在结尾。但是，与vector不同，deques并不保证将其所有元素存储在连续的存储位置：deque通过偏移指向另一个元素的指针访问元素会导致未定义的行为。
 
-两个vector和deques提供了一个非常相似的接口，可以用于类似的目的，但内部工作方式完全不同：虽然vector使用单个数组需要偶尔重新分配以增长，但是deque的元素可以分散在不同的块的容器，容器在内部保存必要的信息以提供对其任何元素的持续时间和统一的顺序接口（通过迭代器）的直接访问。因此，deques在内部比vector更复杂一点，但是这使得他们在某些情况下更有效地增长，尤其是在重新分配变得更加昂贵的很长序列的情况下。
+vector和deques提供了一个非常相似的接口，可以用于类似的目的，但内部工作方式完全不同：虽然vector使用单个数组需要偶尔重新分配以增长，但是deque的元素可以分散在不同的块的容器，容器在内部保存必要的信息以提供对其任何元素的持续时间和统一的顺序接口（通过迭代器）的直接访问。因此，deques在内部比vector更复杂一点，但是这使得他们在某些情况下更有效地增长，尤其是在重新分配变得更加昂贵的很长序列的情况下。
 
 对于频繁插入或删除开始或结束位置以外的元素的操作，deques表现得更差，并且与列表和转发列表相比，迭代器和引用的一致性更低。
 
@@ -167,3 +171,124 @@ template < class Key,                                     // map::key_type
 
 
 #### multimap
+
+### STL面试题汇总
+#### STL的六大组件
+STL的六大组件：容器，算法，迭代器，空间配置器，适配器，仿函数。
+
+* 容器  
+  各种数据结构，来存放数据，从实现角度来看是一种类模板；
+
+* 算法  
+  各种算法的封装，从实现角度来看是一种函数模板；
+
+* 迭代器  
+  是容器与算法之间的胶合剂，即泛型指针；
+
+* 仿函数  
+  一般函数指针可视为狭义的仿函数；
+
+* 空间配置器  
+  负责空间的配置与管理；
+
+* 适配器（配接器）  
+  用来修饰容器或仿函数的迭代器接口。通俗的讲，就是像改锥的接口，装上不同的适配器，才能装上不同的改锥头。
+
+#### 容器分类介绍  
+容器包含关联容器和顺序容器两大类。  
+关联容器和顺序容器的根本不同在于：关联容器中的元素是按关键字来保存和访问的，而顺序容器中的元素则是按它们在容器中的位置来顺序保存和访问的。  
+* 顺序容器有:    
+vector、deque、list；  
+
+* 关联容器有:    
+按关键字有序保存：map、set、multimap、multiset；  
+无序集合：unordered_map、unordered_multimap、unordered_set、unordered_multiset;     
+
+#### 迭代器失效  
+* 一、序列式容器(数组式容器)  
+<u>对于序列式容器(如vector,deque)，序列式容器就是数组式容器</u>，删除当前的iterator会使后面所有元素的iterator都失效。  
+vector,deque是一个顺序容器，在内存中是一块连续的内存(deque是分段连续)，当删除一个元素后，内存中的数据会发生移动，以保证数据的紧凑。所以删除一个数据后，其他数据的地址发生了变化，之前获取的迭代器根据原有的信息就访问不到正确的数据。  
+所以为了防止vector迭代器失效，常用如下方法：
+
+  ```cpp
+  for (iter = cont.begin(); iter != cont.end();)
+  {
+    (*it)->doSomething();
+    if (shouldDelete(*iter))
+        iter = cont.erase(iter);  //erase删除元素，返回下一个迭代器
+    else
+        ++iter;
+  }
+  ```
+  这样<u>删除iter指向的元素后，返回的是下一个元素的迭代器，这个迭代器是vector内存调整过后新的有效的迭代器。</u>
+
+* 二、关联式容器  
+对于关联容器(如map, set,multimap,multiset)，删除当前的iterator，仅仅会使当前的iterator失效，只要在erase时，递增当前iterator即可。这是因为map之类的容器，使用了红黑树来实现，插入、删除一个结点不会对其他结点造成影响。<u>erase迭代器只是被删元素的迭代器失效，但是返回值为void，所以要采用erase(iter++)的方式删除迭代器。</u>  
+map是关联容器，以红黑树或者平衡二叉树组织数据，虽然删除了一个元素，整棵树也会调整，以符合红黑树或者二叉树的规范，但是单个节点在内存中的地址没有变化，变化的是各节点之间的指向关系。  
+所以在map中为了防止迭代器失效，在有删除操作时，常用如下方法：
+  ```cpp
+  for (iter = dataMap.begin(); iter != dataMap.end(); )
+  {
+          int nKey = iter->first;
+          string strValue = iter->second;
+
+          if (nKey % 2 == 0)
+          {
+              dataMap.erase(iter++) 
+              //这样也行
+              // map<int, string>::iterator tmpIter = iter;
+              // iter++;
+              // dataMap.erase(tmpIter);
+
+          }else
+          {
+              iter++;
+          }
+  }
+  ```
+
+* 三、链表式容器  
+对于链表式容器(如list,forwordlist)，删除当前的iterator，仅仅会使当前的iterator失效，这是因为list之类的容器，使用了链表来实现，插入、删除一个结点不会对其他结点造成影响。<u>只要在erase时，递增当前iterator即可，并且erase方法可以返回下一个有效的iterator。</u>  
+  * 方式一: 递增当前iterator
+  ```cpp
+  for (iter = cont.begin(); it != cont.end();)
+  {
+    (*iter)->doSomething();
+    if (shouldDelete(*iter))
+        cont.erase(iter++);
+    else
+        ++iter;
+  }
+  ```
+
+  * 方式二: 通过erase获得下一个有效的iterator
+  ```cpp
+  for (iter = cont.begin(); iter != cont.end();)
+  {
+    (*it)->doSomething();
+    if (shouldDelete(*iter))
+        iter = cont.erase(iter);  //erase删除元素，返回下一个迭代器
+    else
+        ++iter;
+  }
+  ```
+
+* 四、总结  
+
+<u>迭代器失效分三种情况考虑，也是分三种数据结构考虑，分别为数组型，链表型，树型数据结构。</u>
+
+  * 数组型数据结构：  
+  该数据结构的元素是分配在连续的内存中，insert和erase操作，都会使得删除点和插入点之后的元素挪位置，所以，插入点和删除掉之后的迭代器全部失效，也就是说insert(*iter)(或erase(*iter))，然后在iter++，是没有意义的。解决方法：erase(*iter)的返回值是下一个有效迭代器的值。 iter =cont.erase(iter);
+
+  * 链表型数据结构：  
+  对于list型的数据结构，使用了不连续分配的内存，删除运算使指向删除位置的迭代器失效，但是不会失效其他迭代器.解决办法两种，erase(*iter)会返回下一个有效迭代器的值，或者erase(iter++).
+
+  * 树形数据结构：  
+  使用红黑树来存储数据，插入不会使得任何迭代器失效；删除运算使指向删除位置的迭代器失效，但是不会失效其他迭代器。erase迭代器只是被删元素的迭代器失效，但是返回值为void，所以要采用erase(iter++)的方式删除迭代器。
+  
+
+注意：经过erase(iter)之后的迭代器完全失效，该迭代器iter不能参与任何运算，包括iter++,*ite
+
+
+[STL面试知识点](https://zhuanlan.zhihu.com/p/139892287)  
+[C++迭代器失效的几种情况总结](https://www.cnblogs.com/fnlingnzb-learner/p/9300073.html)  
