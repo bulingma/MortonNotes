@@ -11,21 +11,21 @@
       - [优化追加操作](#优化追加操作)
       - [sds模块的API](#sds模块的api)
     - [sds总结](#sds总结)
-  - [linkedlist——双端链表](#linkedlist双端链表)
+  - [linkedlist](#linkedlist)
     - [双端链表的应用](#双端链表的应用)
       - [实现Redis的列表类型](#实现redis的列表类型)
       - [Redis自身功能的构建](#redis自身功能的构建)
     - [链表和链表节点定义](#链表和链表节点定义)
     - [链表实现特点](#链表实现特点)
     - [连表API及时间复杂度](#连表api及时间复杂度)
-  - [hashtables（hash/set内部使用）](#hashtableshashset内部使用)
+  - [hashtables（hash/set use）](#hashtableshashset-use)
     - [字典的应用](#字典的应用)
       - [实现数据库键空间（key space）](#实现数据库键空间key-space)
       - [用作Hash类型键的其中一种底层实现](#用作hash类型键的其中一种底层实现)
     - [字典的定义](#字典的定义)
     - [字典的方法](#字典的方法)
     - [字典的剖析](#字典的剖析)
-  - [skiplist（zset使用）](#skiplistzset使用)
+  - [skiplist（zset use）](#skiplistzset-use)
     - [跳跃表的实现](#跳跃表的实现)
       - [跳跃表定义](#跳跃表定义)
       - [跳跃表api](#跳跃表api)
@@ -138,7 +138,7 @@ sds还有另一部分功能性函数，比如sdstolower、sdstrim、sdscmp，等
   –二进制安全；
 3. sds会为追加操作进行优化：加快追加操作的速度，并降低内存分配的次数，代价是多占用了一些内存，而且这些内存不会被主动释放。  
 
-## linkedlist——双端链表
+## linkedlist
 ### 双端链表的应用
 双端链表作为一种通用的数据结构，在Redis内部使用得非常多：它既是Redis列表结构的底层实现之一，还被大量Redis模块所使用，用于构建Redis的其他功能。主要有如下几种功能：  
 #### 实现Redis的列表类型      
@@ -214,7 +214,7 @@ void listJoin(list *l, list *o);
 * 复杂度  
 ![双端链表的API及复杂度](../../z_images/redis/linkedlist_api_and_big_o.png)
 
-## hashtables（hash/set内部使用）
+## hashtables（hash/set use）
 ### 字典的应用
 字典在Redis中的应用广泛，使用频率可以说和SDS以及双端链表不相上下，基本上各个功能模块都有用到字典的地方。其中，字典的主要用途有以下两个：  
 * 1.实现数据库键空间（key space）；
@@ -340,7 +340,7 @@ typedef struct dict {
  2.强制rehash：ratio大 于 变 量dict_force_resize_ratio（目 前 版 本 中，dict_force_resize_ratio的值为5）。  
  Note:什么时候dict_can_resize会为假？在前面介绍字典的应用时也说到过，一个数据库就是一个字典，数据库里的哈希类型键也是一个字典，当Redis使用子进程对数据库执行后台持久化任务时（比如执行BGSAVE或BGREWRITEAOF时），为了最大化地利用系统的copy on write机制，程序会暂时将dict_can_resize设为假，避免执行自然rehash，从而减少程序对内存的触碰（touch）。当持久化任务完成之后，dict_can_resize会重新被设为真。另一方面，当字典满足了强制rehash的条件时，即使dict_can_resize不为真（有BGSAVE或BGREWRITEAOF正在执行），这个字典一样会被rehash。
 
-## skiplist（zset使用）
+## skiplist（zset use）
 跳跃表（skiplist）是一种随机化的数据，由William Pugh在论文《Skip lists: a probabilisticalternative to balanced trees》中提出，这种数据结构以有序的方式在层次化的链表中保存元素，它的效率可以和平衡树媲美——查找、删除、添加等操作都可以在对数期望时间下完成，并且比起平衡树来说，跳跃表的实现要简单直观得多。
 
 跳跃表主要由以下部分构成：
