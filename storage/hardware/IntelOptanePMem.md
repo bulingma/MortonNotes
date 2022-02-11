@@ -1,6 +1,7 @@
 
 <!-- TOC -->
 
+- [官网介绍](#官网介绍)
 - [Intel Optane Persistent Memory——PMem](#intel-optane-persistent-memorypmem)
 - [持久内存主要优势场景](#持久内存主要优势场景)
   - [场景 1：大内存低成本解决方案](#场景-1大内存低成本解决方案)
@@ -16,6 +17,20 @@
 - [参考](#参考)
 
 <!-- /TOC -->
+
+
+## 官网介绍  
+[英特尔® 傲腾™ 持久内存](https://www.intel.cn/content/www/cn/zh/products/details/memory-storage/optane-dc-persistent-memory.html)  
+[英特尔® 傲腾™ 持久内存 200 系列 (512 GB PMem) 模块](https://www.intel.cn/content/www/cn/zh/products/sku/203880/intel-optane-persistent-memory-200-series-512gb-pmem-module/specifications.html)  
+
+* 封装规格  
+板型 Persistent Memory Module (PMem)  
+<u>接口 DDR-T</u>  
+
+* 先进技术  
+硬件加密 AES 256 bit  
+
+
 ## Intel Optane Persistent Memory——PMem
 持久内存三个最重要的特征：大， 快，持久性：  
 * 大：  

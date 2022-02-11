@@ -4,10 +4,11 @@
   - [0.1、二叉树总结](#01二叉树总结)
     - [必刷题目](#必刷题目)
   - [0.2、回溯法总结](#02回溯法总结)
+    - [2.1、backtracking programming template](#21backtracking-programming-template)
   - [0.3、贪心总结](#03贪心总结)
-    - [3.1、模版](#31模版)
+    - [3.1、greedy algorithm template](#31greedy-algorithm-template)
   - [0.4、动态规划总结](#04动态规划总结)
-    - [4.1、模版](#41模版)
+    - [4.1、dynamic programming template](#41dynamic-programming-template)
     - [4.2、注意事项](#42注意事项)
     - [4.3、背包问题总结](#43背包问题总结)
       - [4.3.1、背包递推公式](#431背包递推公式)
@@ -110,7 +111,7 @@
 
 
 ### 0.2、回溯法总结
-
+#### 2.1、backtracking programming template
 回溯算法模板框架如下:
 
 * 回溯三部曲
@@ -139,7 +140,7 @@ void backtracking(参数) {
 
 ### 0.3、贪心总结
 
-#### 3.1、模版
+#### 3.1、greedy algorithm template
 
 * **确定问题可以通过局部最优，推出整体最优，并想不出反例。**
 * **将问题分解为若干个子问题**
@@ -153,7 +154,7 @@ void backtracking(参数) {
 
 ### 0.4、动态规划总结
 
-#### 4.1、模版
+#### 4.1、dynamic programming template
 
 动态规划算法模板框架如下:
 
