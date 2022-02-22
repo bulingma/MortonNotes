@@ -1,0 +1,3 @@
+## Facebook Haystack
+
+Facebook相册后端早期采用基于NAS的存储，通过NFS挂载NAS中的照片文件来提供服务。后来处于性能和成本考虑，自主研发了Facebook Haystack存储相册数据。

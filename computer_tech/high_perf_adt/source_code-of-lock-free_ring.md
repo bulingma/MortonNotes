@@ -19,7 +19,7 @@
 
 # lock-free ring介绍
 cpp标准库和boost、dpdk均实现了lock-free ring。
-采取的方法都是CAS(compary and swap, dpdk里面很多函数都说使用compare and set)
+采取的方法都是CAS(compary and swap, dpdk里面很多函数都说使用compare and swap)
 
 
 ## 0、CAS原语
