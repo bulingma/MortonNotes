@@ -101,7 +101,8 @@ Log Replication即数据同步。Raft和Redis一样，数据只从Master节点�
 
 #### 全量复制
 
-全量复制即把所有的数据都发送给子节点。我们分别看Redis和Raft的做法异同。这部分内容其实就是Raft中的Log Compaction。
+全量复制即把所有的数据都发送给子节点。我们分别看Redis和Raft的做法异同。这部分内容其实就是Raft中的Log Replication  
+
 
 ##### Raft的做法
 

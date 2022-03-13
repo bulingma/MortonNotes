@@ -7,6 +7,7 @@
 - [4. spdk bdev](#4-spdk-bdev)
 - [5. spdk 架构](#5-spdk-架构)
 - [6. 附录](#6-附录)
+- [7. 最新架构](#7-最新架构)
 
 <!-- /TOC -->
 
@@ -69,7 +70,14 @@ spdk在上述加速访问NVMe存储的基础上，提供了块设备（bdev）�
 讲到这里，各位同学应该明白了，spdk目前的的应用场景主要是针对块存储，可以说块存储的整个存储的基石，再其之上我们又构建了各种文件存储、对象存储、表格存储、数据库等等，我们可以如各种云原生数据库一样将上层的分布式系统直接构建在分布式块存储、对象存储之上，也可以将其他存储需要管理的元数据、索引下推到块层，直接用spdk优化上层存储，比如目前的块存储使用lba作为索引粒度管控，我们可以将索引变为文件/对象，在其之上构建文件/对象存储系统。
 
 ## 5. spdk 架构
-![picture 4](../../z_images/spdk-architecture.png) 
+![picture 4](../../z_images/spdk-architecture.png)   
+
 
 ## 6. 附录
 [什么是SPDK,以及什么场景需要它](https://zhuanlan.zhihu.com/p/362978954)
+
+
+## 7. 最新架构
+SPDK整体架构分为四层，自上而下，最上层的应用协议层指代SPDK对外支持的协议以及相关的存储应用，包含有网络存储NVMe-oF，iSCSI Target以及虚拟化vhost-blk/scsi Target等；第二层为存储服务层，他提供了对块或者文件的抽象，用来支持更多的存储业务，例如提供了Blobstore；第三层抽象了通用的块存储设备bdev，用来支持后端不同的存储方式，例如NVMe，NVMe-oF，Ceph RBD等，并支持自定义的存储设备；底层则是驱动层，在这一层上，SPDK实现了用户态驱动用来加速各类存储应用。右侧例举了一些SPDK可集成的服务以及应用场景。
+![spdk-architecture-2022](../../z_images/spdk-architecture-2022) 
+[初识SPDK](https://mp.weixin.qq.com/s/VdCSfAs7Jml8YZFjOXNkXQ)
