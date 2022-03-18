@@ -312,7 +312,8 @@ public:
     3.将两个排序好的子序列合并成一个最终的排序序列。
     ```
 
-* 代码
+
+* 数组版本代码
     ```cpp
     #include <cstdio>
     #include <iostream>
@@ -383,6 +384,10 @@ public:
         return 0;
     }
     ```
+
+* 链表版本代码
+
+
 
 ##### Multiple Merge Sort
 * 多路归并排序   
