@@ -1,9 +1,11 @@
 
 ## 技术点
-mutex & condition_variable & futrue；     
-使用queue存储task；    
-queue没有任务时，thread condition.wait睡眠，等待换醒，用户enqueue时唤醒thread；    
-the constructor just launches some amount of workers；  
+mutex & condition_variable & futrue & share_ptr； 
+
+1、线程池内部使用queue存储每一个用户的task，queue元素的增删接口（多线程操作）需要加锁（mutex），每个用户的task被封装为一个仿函数对象存入queue;      
+2、线程池内部使用vector存储thread，线程池构造函数中按照用户配置个数启动多个线程，每个线程均检查queue是否为空，为空则conndition.wait;     
+3、用户enqueue一个task时，框架加锁将task放入queue中，并且返回用户一个future对象，用户调用future.get获取task执行的结果;    
+
 
 ## cpp11实现源码线程池
 
@@ -45,6 +47,7 @@ inline ThreadPool::ThreadPool(size_t threads)
     :   stop(false)
 {
     for(size_t i = 0;i<threads;++i)
+        // 这个地方怎么确定会按照用户的threads个数占用多个cpu核呢？
         workers.emplace_back(
             [this]
             {

@@ -13,6 +13,7 @@
   - [Ceph/RBD](#cephrbd)
 - [File Storage](#file-storage)
   - [GoogleFileSystem](#googlefilesystem)
+  - [GFS2 (colossus-巨象)](#gfs2-colossus-巨象)
   - [FacebookHaystack](#facebookhaystack)
   - [TaobaoFileSystem](#taobaofilesystem)
   - [Google/HDFS](#googlehdfs)
@@ -90,6 +91,12 @@ OpenStack is a cloud operating system that controls large pools of compute, stor
 文件系统存储：通常意义是支持 POSIX 接口，它跟传统的文件系统如 Ext4 是一个类型的，但区别在于分布式存储提供了并行化的能力，如 Ceph 的 CephFS (CephFS是Ceph面向文件存储的接口)，但是有时候又会把 GlusterFS ，HDFS 这种非POSIX接口的类文件存储接口归入此类。当然 NFS、NAS也是属于文件系统存储；
 
 ### GoogleFileSystem
+
+### GFS2 (colossus-巨象)  
+Colossus is the successor to the Google File System (GFS) as mentioned in the paper on Spanner at OSDI 2012. Colossus is also used by spanner to store its tablets. 
+
+[Colossus: Successor to the Google File System (GFS)](https://www.systutorials.com/colossus-successor-to-google-file-system-gfs/)
+
 ### FacebookHaystack
 ### TaobaoFileSystem
 ### Google/HDFS
