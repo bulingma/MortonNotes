@@ -12,10 +12,10 @@
 
 <!-- /TOC -->
 
-## LSM名词解释
+## LSM名词解释  
 LSM树: Log-Structured-Merge-Tree  
-WAL: Write-ahead logging，预写式日志
-SSTable: Sorted String Table，有序键值对集合
+WAL: Write-ahead logging，预写式日志  
+SSTable: Sorted String Table，有序键值对集合  
 
 ## LSM介绍  
 ### 背景  
