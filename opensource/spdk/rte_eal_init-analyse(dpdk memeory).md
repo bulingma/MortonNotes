@@ -136,7 +136,7 @@ DPDK在用户态实现了一套内存管理机制。
 #define RTE_MAX_HEAPS 32								/** dpdk最大支持32个heap **/
 #define RTE_MAX_MEMSEG_LISTS 128	/** dpdk最大支持的memseg_list个数，memseg_list个数和numa num，总内存等有关系**/	
 #define RTE_MAX_MEMSEG_PER_LIST 8192		/** dpdk每个memseg_list支持最大的memseg个数：8192 **/
-#define RTE_MAX_MEM_MB_PER_LIST 32768		/** dpdk每个memseg_list支持最大的memseg个数：32768 **/
+#define RTE_MAX_MEM_MB_PER_LIST 32768		/** dpdk每个memseg_list支持最大的mem个数：32768 **/
 #define RTE_MAX_MEMSEG_PER_TYPE 32768		/** dpdk每种memory type支持的最大memseg个数：32768 **/
 #define RTE_MAX_MEM_MB_PER_TYPE 65536		/** dpdk每种memory type支持的最大容量：65536MB **/
 #define RTE_MAX_MEMZONE 2560						/** dpdk最大支持的memzone个数：2560 **/

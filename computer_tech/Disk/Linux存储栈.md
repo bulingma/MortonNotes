@@ -1,5 +1,7 @@
-[[linux][storage]Linux存储栈](https://cloud.tencent.com/developer/article/1087520)
+[[linux][storage]Linux存储栈](https://cloud.tencent.com/developer/article/1087520)  
 可以结合着下面这个一起理解virto io驱动。
 [初识SPDK](https://mp.weixin.qq.com/s/VdCSfAs7Jml8YZFjOXNkXQ)
 
+
+在理解了SPDK的用户态驱动以后，我们再回顾一下原本内核中的I/O操作的逻辑：当通过系统调用陷入到了内核态以后，每一个块设备都需要在自己的内核中调用各自的驱动。显然，直接暴露给各个驱动的接口到上层应用并不是一个好的方案，这不利于引入新的硬件设备。为此，Linux内核抽象出了通用设备块，用来支持上层应用与各个设备驱动的交互，隐藏了不同硬件设备的特性，并为这些I/O操作进行了一个统一的管理，避免硬件设备去支持较高的I/O并发量。同样在SPDK中，引入了用户态驱动以后，与之对应的，我们也需要用户态通用块来支持底层不同的存储需求。
 

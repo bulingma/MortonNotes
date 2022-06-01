@@ -78,6 +78,10 @@ spdk在上述加速访问NVMe存储的基础上，提供了块设备（bdev）�
 
 
 ## 7. 最新架构
-SPDK整体架构分为四层，自上而下，最上层的应用协议层指代SPDK对外支持的协议以及相关的存储应用，包含有网络存储NVMe-oF，iSCSI Target以及虚拟化vhost-blk/scsi Target等；第二层为存储服务层，他提供了对块或者文件的抽象，用来支持更多的存储业务，例如提供了Blobstore；第三层抽象了通用的块存储设备bdev，用来支持后端不同的存储方式，例如NVMe，NVMe-oF，Ceph RBD等，并支持自定义的存储设备；底层则是驱动层，在这一层上，SPDK实现了用户态驱动用来加速各类存储应用。右侧例举了一些SPDK可集成的服务以及应用场景。
+SPDK整体架构分为四层，自上而下。  
+<u>最上层的应用协议层指代SPDK对外支持的协议以及相关的存储应用，包含有网络存储NVMe-oF，iSCSI Target以及虚拟化vhost-blk/scsi Target等；</u>  
+<u>第二层为存储服务层，他提供了对块或者文件的抽象，用来支持更多的存储业务，例如提供了Blobstore；</u>  
+<u>第三层抽象了通用的块存储设备bdev，用来支持后端不同的存储方式，例如NVMe，NVMe-oF，Ceph RBD等，**并支持自定义的存储设备；**</u>  
+<u>底层则是驱动层，在这一层上，SPDK实现了用户态驱动用来加速各类存储应用。右侧例举了一些SPDK可集成的服务以及应用场景。</u>
 ![spdk-architecture-2022](../../z_images/spdk-architecture-2022) 
 [初识SPDK](https://mp.weixin.qq.com/s/VdCSfAs7Jml8YZFjOXNkXQ)

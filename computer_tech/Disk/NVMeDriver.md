@@ -1,4 +1,8 @@
 ## Introduction
+
+NVMe协议是一种为了SSD固态硬盘和主机通信的速度更快而定义的规范。  
+将其本地存储性能推广到网络有NVMe-oF协议，用来支持InfiniBand、光纤或者以太网等。
+
 ## 重要设计
 
 ### NVMe 命令 
