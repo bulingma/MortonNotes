@@ -13,11 +13,18 @@
 			- [5.SPDK用户态驱动多进程的支持](#5spdk用户态驱动多进程的支持)
 		- [4.4.2 SPDK应用框架](#442-spdk应用框架)
 		- [4.4.3 SPDK用户态块设备层](#443-spdk用户态块设备层)
-		- [**4.4.4** SPDK vhost target](#444-spdk-vhost-target)
-		- [**4.4.5** SPDK iSCSI Target](#445-spdk-iscsi-target)
-		- [**4.4.6** SPDK NVMe-oF Target](#446-spdk-nvme-of-target)
-		- [**4.4.7** SPDK RPC](#447-spdk-rpc)
-		- [**4.4.8** SPDK生态工具介绍](#448-spdk生态工具介绍)
+		- [4.4.4 SPDK vhost target](#444-spdk-vhost-target)
+		- [4.4.5 SPDK iSCSI Target](#445-spdk-iscsi-target)
+			- [1.SPDK iSCSI Target加速设计和实现](#1spdk-iscsi-target加速设计和实现)
+			- [2.在Linux环境下配置SPDK iSCSI Target示例](#2在linux环境下配置spdk-iscsi-target示例)
+		- [4.4.6 SPDK NVMe-oF Target](#446-spdk-nvme-of-target)
+		- [4.4.7 SPDK RPC](#447-spdk-rpc)
+			- [1.RPC](#1rpc)
+			- [2.JSON](#2json)
+			- [3.JSON-RPC](#3json-rpc)
+			- [4.SPDK JSON-RPC](#4spdk-json-rpc)
+			- [5.SPDK JSON-RPC运行机制](#5spdk-json-rpc运行机制)
+		- [4.4.8 SPDK生态工具介绍](#448-spdk生态工具介绍)
 
 <!-- /TOC -->
 
@@ -227,17 +234,11 @@ SPDK Bdev设计主要考虑以下几个维度:  一是，抽象出来的通用�
 
 能够让通用块层起到承接上层应用的读/写请求，高性能地利用下层设备的读/写性能，在实现高性能、可扩展性的同时，还需要考虑各种异常情况、各种存储特性的需求。这些都是在实现数据流时需要解决的问题。
 
-
-
 * 3.通用块层的管理
 
 管理通用块层涉及两方面问题，一方面是，对上层模块、对具体应用是如何配置的，怎么样才能让应用实施到某个通用块设备。<u>这里有两种方法，一种是通过配置文件，另一种是通过远程过程调用(RPC)的方法在运行过程中动态地创建和删除新的块设备。</u>
 
 当我们引入更多的存储特性在通用块层的时候，我们可以把块设备分为两种:支持直接操作后端硬件的块设备，可以称之为基础块设备 (Base Bdev); 构建在基础块设备之上的设备，比如逻辑卷、加密、 压缩块设备，称之为虚拟块设备(Virtual Bdev)。
-
-
-
-
 
 * 4.逻辑卷   
 
@@ -282,17 +283,192 @@ SPDK的流量控制，是基于通用块层来实现的，这样设计的好处�
 
 · 和后端具体设备无关，无论是本地的高速NVMe SSD、低速的硬 盘驱动器，还是某个远端的块设备，这些具体的硬件已经由SPDK通用 块层隐藏起来了。但是需要注意的是，流量控制本身是不会提高硬件的 自身能力的上限的，需要给出合理的流量控制的目标。
 
-
-
 前面我们详细描述了通用块层的一些主要结构，包括通用块设备结 构、I/O请求结构、I/O Channel结构、每个Channel的上下文块设备通道 结构等，也具体描述了通用块层的线程模型。这里涉及流量控制的主要 操作流程，就是结合这些重要数据结构和线程模型来实现资源上的管理 和I/O请求上的管理的。
 
 SPDK基于通用块层的流量控制提供了很好的扩展性。在算法层面 上的实现简单明确，如果需要引入更高级的流量控制算法，可以很容易 地替换默认的算法，也可以支持其他更多种类的流量控制，比如读/写 分开的IOps，带宽限速;比如读/写不同优先级的区别控制;等等。 SPDK通用块层和SPDK应用框架为这一存储服务提供了很好的技术保障 和可扩展性。
 
-#### **4.4.4** SPDK vhost target
-#### **4.4.5** SPDK iSCSI Target
+#### 4.4.4 SPDK vhost target
+主流的I/O设备虚拟化的方案:
+· 纯软件模拟：完全利用软件模拟出一些设备给虚拟机使用，主要的工作可以在Simics、Bochs、纯QEMU解决方案中看到。
+· 半虚拟（Para-Virtualization）：主要是一种frontend-backend的模型，在虚拟机中的Guest  OS中使用frontend的驱动，Hypervisor中暴露出backend接口。这种解决方案需要修改Guest OS，或者提供半虚拟化的前端驱动。
+· 硬件虚拟化：主流的方案有SR-IOV、VT-D等，可以把整个设备直接分配给一个虚拟机，或者如果设备支持SR-IOV，就可以把设备的VF（Virtual Function）分配给虚拟机。
 
-#### **4.4.6** SPDK NVMe-oF Target
+对于以上3种虚拟化的解决方案，我们会把重点放在virtio解决方案，即半虚拟化上，<u>因为SPDK的vhost-scsi/blk可以用来加速QEMU中半虚拟化的virtio-scsi/blk。另外针对QEMU中NVMe的虚拟化方案，我们也给出了vhost-NVMe的加速方案</u>。虽然SPDK  vhost-scsi/blk主要是用来加速virtio协议的，SPDK  vhost-NVMe用于加速虚拟机中的NVMe协议的，但是这3种加速方案其实可以有机地整合为一个整体的vhost target加速方案。
 
-#### **4.4.7** SPDK RPC
+* 1.virtio
+  virtio是I/O虚拟化中一种非常优秀的半虚拟化方案，需要在Guest的操作系统中运行virtio设备的驱动程序，通过virtio设备和后端的Hypervisor或用于加速的vhost进行交互。
+  <u>在QEMU中，virtio设备是QEMU为Guest操作系统模拟的PCI设备</u>，这个设备可以是传统的PCI设备或PCIe设备，遵循PCI-SIG定义的PCI规范，可以具有配置空间、中断配置等功能。
 
-#### **4.4.8** SPDK生态工具介绍
+  virtio在QEMU中的总体实现可以分成3层（见图4-34）：前端是设备层，位于Guest操作系统内部；中间是虚拟队列传输层，Guest和QEMU都包含该层，数据传输及命令下发完成都是通过该层实现的；第3层是virtio后端设备，用于具体落实来自Guest端发送的请求。
+
+* 2.vhost加速
+  如前所述，virtio后端设备用于具体响应Guest的命令请求。例如，对virtio-scsi设备来讲，该virtio后端负责SCSI命令的响应，<u>QEMU负责模拟该PCI设备，把该SCSI命令响应的模块在QEMU进程之外实现的方案称为vhost。</u>这里同样分为两种实现方式，在Linux内核中实现的叫作vhost-kernel，而在用户态实现的叫作vhost-user
+
+  以virtio-scsi为例，目前主要有3种virtio-scsi后端的解决方案。
+
+	1）QEMU virtio-scsi:   
+	这个方案存在如下两个严重影响性能的因素。
+	· 当Guest提交新的SCSI请求到virtqueue队列时，需要告知QEMU哪个队列含有最新的SCSI命令。
+	· 在实际处理具体的SCSI读/写命令时（在hostOS  中），存在用户态到内核态的数据副本。
+
+	​	2）Kernel vhost-scsi:  
+	​	这个方案是QEMU  virtio-scsi的后续演进，基于LIO在内核空间实现为虚拟机服务的SCSI设备。实际上vhost-kernel方案并没有完全模拟一个PCI设备，QEMU仍然负责对该PCI设备的模拟，只是把来自virtqueue的数据处理逻辑拿到	内核空间了。
+
+	​	3）SPDK vhost-user-scsi:  
+	​	这个方案是基于Kernel vhost-scsi的进一步改进。SPDK vhost-user-scsi方案消除了这两方面的影响，后端的I/O处理线程在轮询所有的virtqueue，因此不需要Guest在添加新的请求到virtqueue后更新PCI的配置空间。SPDK vhost-user-scsi的后端I/O处理模块轮询机制加上零拷贝技术基本解决了前面我们提到的阻碍QEMU virtio-scsi性能提升的两个关键点。
+
+* 3.SPDK vhost-scsi加速
+
+使用SPDK vhost-scsi启动一个VM实例的命令如下：
+
+```
+-object memory-backend-file,id=mem0,size=4G,mem-path=/dev/hugepages,share=on -chardev socket,id=char0,path=/path/vhost.0
+```
+
+这里其实引入了vhost-user技术里面的两个关键技术实现：<u>指定mem-path意味着QEMU会在Guest  OS的内存中创建一个文件，share=on选项允许其他进程访问这个文件，也就意味着能访问Guest  OS内存，达到共享内存的目的。</u>字符设备/path/vhost.0是指定的socket文件，用来建立QEMU和后端的Slave target，即SPDK vhost target之间的通信连接。
+
+QEMU Guest和SPDK vhost target是两个独立的进程，vhost-user方案一个核心的实现就是队列在Guest和SPDK  vhost  target之间是共享的，那么接下来我们就看一下vhost是如何实现这个内存共享的，以及Guest物理地址到主机的虚拟地址是如何转换的。
+
+在vhost-kernel方案中，QEMU使用ioctl系统调用和内核的vhost-scsi模块建立联系，从而把QEMU中模拟的SCSI设备部分传递到了内核态，即内核态对该SCSI设备不是完全模拟的，仅仅负责对virtqueue进行处理，因此这个ioctl的消息主要负责3部分的内容传递：<u>Guest内存映射；Guest  Kick  Event、vhost-kernel驱动用来接收Guest的消息</u>，当接收到该消息后即可启动工作线程；IRQ  Event用于通知Guest的I/O完成情况。<u>同样地，当把内核对virtqueue处理的这个模块迁移到用户态时，以上3个主要部分的内容传递就变成了UNIX  Domain  socket文件了，消息格式及内容和Kernel的ioctl相比有许多相似和重复的地方。</u>
+
+* 4 .SPDK vhost-NVMe加速
+
+我们首先看一下virtio和NVMe协议的一个对比情况，virtio和NVMe协议在设计时都采用了相同的环型结构，virtio使用avaiable和used ring作为请求和响应，而NVMe使用提交队列和完成队列作为请求和响应。
+
+图4-37 NVMe读/写的具体流程
+
+QEMU中很早就添加了对NVMe设备的模拟，和QEMU  virtio-scsi类似，使用任意的文件来实现具体的NVMe  I/O命令，和之前的QEMUvirtio-scsi方案相比，QEMU  NVMe存在相同的性能瓶颈，在图4-37的步骤2和步骤8，Guest都要写NVMe  PCI配置空间寄存器，<u>因此会存在VMM  Trap自陷问题，由于后端主机使用文件来承载I/O命令，同样存在用户态到内核态数据副本的问题。如果要提升性能，那么同样需要解决这两个关键瓶颈。</u>
+
+针对Guest提交命令和完成命令时的写PCI寄存器问题，NVMe 1.3的协议给出了解决方案，即shadow doorbell。
+
+针对上面提到的另外一个性能瓶颈——内存副本，这里采用和vhost-user-scsi类似的方案。针对虚拟化场景，由于我们的后端存在高性能的物理NVMe控制器及SPDK本身的用户态NVMe驱动，因此对VM中下发的I/O命令，我们通过内存地址转换（Guest物理地址到主机虚拟地址）即可实现VM到NVMe设备端到端的数据零拷贝实现。
+
+实现这个方案存在一个前提，由于物理的NVMe设备需要使用控制器内部的DMA引擎搬移数据，要求所有的I/O命令对应的数据区域都是物理内存连续的，因此这里我们需要使用Linux内核提供的hugetlbfs机制提供连续的物理内存页面。
+
+
+#### 4.4.5 SPDK iSCSI Target
+SPDK iSCSI Target从2013年开始被开发，最初的框架基于Linux SCSI TGT，但是随着整个项目的进展，为了更好地发挥快速存储设备 的性能，进而基于SPDK应用框架进行实现，以AIO、无锁化I/O数据路 径等为设计原则，和原来的Linux SCSI TGT有很大的区别。  
+<u>SPDK iSCSI Target的设计和实现利用了SPDK库的以下模块:应用框架、网络、iSCSI、SCSI、JSON-RPC、块设备和SPDK的设备驱动程序。对于iSCSI Target而言，它使用应用框架启动，并解析相关配置文件以初始化，也能接收和处理JSON-RPC请求，然后构建不同的子系 统，如iSCSI、SCSI、块设备等子系统。对于I/O的处理，在网络接收到iSCSI的PDU包后，依次在iSCSI、SCSI、块设备层处理请求，最后由设备驱动程序处理。当I/O返回时，iSCSI Target程序将以相反的顺序处理，即块设备、SCSI、iSCSI、网络层。我们采用运行直到完成的模型，从而达到采用无锁化和异步处理I/O的方式的目的。</u>
+
+##### 1.SPDK iSCSI Target加速设计和实现  
+与其他常见的iSCSI Target实现(LIO、Linux SCSI TGT)相比，SPDK iSCSI Target使用以下几种方法来提高CPU单核的性能。  
+* 1)模块化设计  
+针对不同的功能模块，SPDK创建了多个子系统目录。对于SPDK iSCSI Target，SPDK创建了iSCSI模块，路径为 spdk/lib/event/subsystem/iscsi和spdk/lib/iscsi，该模块定义了所有和iSCSI相关的函数和数据结构。在SPDK iSCSI Target运行之前，iSCSI子系统 先会被初始化。  
+
+* 2)每个CPU核处理一组iSCSI的连接  
+根据SPDK应用框架，每个CPU上启动一个Reactor不断地去执行两 组Poller，一组基于timer的Poller的列表和一组普通Poller列表。为此 SPDK的iSCSI Target在每个core的Reactor上都创建了一个polling group， 用于处理这个组里面的所有iSCSI连接。对应于每个polling group，会有 两组Poller，它们分别执行spdk_iscsi_poll_group_poll和 spdk_iscsi_poll_group_handle_nop。  
+
+* 3)基于简单的负载平衡算法  
+当iSCSI Target使用多个CPU核启动的时候，根据SPDK的应用程序 框架，会有多个Reactor，每个Reactor上都会有Poller。因为监听网络事 件的acceptor默认运行在一个Reactor的Poller上，所以每个新进入的 iSCSI连接都会在acceptor所在的Reactor上运行。如此一来，就会导致所 有的CPU core处理的iSCSI连接不均衡。  
+
+为此我们设计了一个算法。因为iSCSI的连接有状态的变化，所以 当连接从login状态转化为FFPlogin状态FFP(Full Feature Phase)的时候，我们会对iSCSI连接进行迁移，也就是从一个Reactor上执行转入另一个Reactor。没有进入FFP的iSCSI连接不用进行迁移，因为这些iSCSI 连接很快会断掉，而且不涉及对后端I/O数据的处理，为此不需要进行迁移。我们会设计一个简单的算法来计算每个Reactor上的iSCSI connection连接数目，然后根据对应的连接的会话等信息，选择一个新的Reactor。迁移的过程相对来讲还是比较复杂的，我们首先会将这个iSCSI连接从当前的polling group中去除(包括有关网络事件的监听)， 然后加入另外Reactor的polling group中(通过SPDK应用框架提供的线程间通信机制)。  
+
+* 4)零拷贝支持  
+对于iSCSI读取命令，我们利用零拷贝方法，这意味着缓冲区在 SPDK Bdev层中进行分配，并且在将iSCSI datain响应pdus发送到iSCSI 启动器后，此缓冲区将被释放。在所有iSCSI读取处理过程中，不存在从存储模块到网络模块的数据复制。
+
+* 5)iSCSI数据包处理优化  
+SPDK对读和写的数据包处理都有64KB的限制。当处理读请求大于64KB的时候，SPDK就会创建DATAIN任务队列，同时会设置DATAIN 任务数的最大值为64KB。SPDK创建的每个DATAIN任务大小都是64KB。针对写命令，SPDK定义了MaxBustLength为64KB乘以connection的DATAOUT缓冲数。所以在发送R2T时，在R2T中设置的可以接收的数据大小为MaxBustLength和剩余待传输数据中的最小值，以保证对方发过来的数据包符合协议的需求。
+
+* 6)TCP/IP协议栈优化  
+SPDK库对TCP/IP的网络处理进行了相应的API封装，这样就可以整 合不同的TCP/IP协议栈。目前SPDK库既可以使用内核的TCP/IP协议栈，也可以使用用户态的TCP/IP协议栈进行矢量包处理(V ector Packet Processing，VPP)。    
+VPP是思科VPP技术的开源版本，一个高性能包处理栈，完全运行 于用户态。作为一个可扩展的平台框架，VPP能够提供随时可用的产品 级的交换机或路由器功能。    
+SPDK主要使用了VPP的socket处理，包括socket的创建、监听、连 接、接收和关闭。SPDK也会调用VPP的epoll API来创建socket group。    
+在配置SPDK的时候指定VPP的目录路径，就可以使用VPP。<u>所以对SPDK的iSCSI Target来讲，**网络的优化可以选择VPP提供的用户态TCP/IP协议栈，然后使用DPDK提供的PMD网卡**，就可以实现从网络到后端数据处理的完全零拷贝解决方案。</u>  
+
+
+##### 2.在Linux环境下配置SPDK iSCSI Target示例  
+
+#### 4.4.6 SPDK NVMe-oF Target
+
+NVMe协议制定了本机高速访问PCIe SSD的规范，相对于SATA、 SAS、AHCI等协议，NVMe协议在带宽、延迟、IOps等方面占据了极大 的优势，但是在价格上目前相对来讲还是比较贵的。不过不可否认的是，配置PCIe SSD的服务器已经在各种应用场景中出现，并成为业界的一种趋势。  
+
+<u>此外为了把本地高速访问的优势暴露给远端应用，诞生了NVMe-oF协议。NVMe-oF Target是NVMe协议在不同传输网络(transport)上面的延伸。</u> NVMe-oF协议中的transport可以多种多样，如以太网、光纤通道、Infiniband等。<u>当前比较流行的transport实现是基于RDMA的Ethernet transport、Linux Kernel和SPDK的NVMe-oF Target等</u>，另外对于光纤通道的transport，NetApp基于SPDK NVMe-oF Target的代码，实现了基于光纤通道的transport。  
+
+NVMe-oF Target严格来讲不是必需品，在没有该软件的时候，我们可以使用iSCSI Target或其他解决方案来替换。由于iSCSI Target比较成 熟和流行，我们有必要把NVMe-oF Target与iSCSI Target进行对比，如表4-2所示。
+
+从表4-2中我们可以获得如下信息。
+· 目前NVMe-oF Target在以太网上的实现，需要有支持RDMA功 能的网卡，如支持RoCE或iWARP。相比较而言，iSCSI Target更加通用，有没有RDMA功能支持关系不是太大。  
+
+· 标准的NVMe-oF Target主要是为了导出PCIe SSD(并不是说不能导出其他块设备)，iSCSI Target则可以导出任意的块设备。从这一方面来讲，iSCSI Target的设计目的无疑更加通用。  
+
+· NVMe-oF Target是NVMe协议在网络上的扩展，毫无疑问的是如果访问远端的NVMe盘，使用NVMe-oF协议更加轻量级，直接是NVMe-oF→NVMe协议到盘，相反如果使用iSCSI Target，则需要iSCSI→SCSI→NVMe协议到盘。显然在搭载了RNIC + PCIe SSD的情况下，NVMe-oF能发挥更大的优势。
+
+总体而言iSCSI Target更加通用，NVMe-oF Target的设计初衷是考虑性能问题。当然在兼容性和通用性方面，NVMe-oF Target也在持续进步。  
+
+· 兼容已有的网卡: NVMe-oF新的规范中已经加入了基于TCP/IP的支持，这样NVMe-oF就可以运行在没有RDMA支持的网卡上了。已有的网卡就可以兼容支持iSCSI及NVMe-oF协议，意味着当用户从iSCSI迁移到NVMe-oF上时，可以继续使用旧设备。当然从性能方面来讲，必然没有RDMA网卡支持有优势。  
+
+· 后端存储虚拟化: NVMe-oF协议一样可以导出非PCIe SSD，使得整个方案兼容。比如SPDK的NVMe-oF Target提供了后端存储的简单抽象，可以虚拟出相应的NVMe盘。在SPDK中可以用malloc的块设备或基于libaio的块设备来模拟出NVMe盘，把NVMe协议导入SPDK通用块设备的语义中。当然远端看到的依然是NVMe盘，这只是协议上的兼 容，性能上自然不能和真实的相匹配，但是这解决了通用性的问题。
+
+如此NVMe-oF协议可以做到与iSCSI一样的通用性。当然在长时间内，NVMe-oF和iSCSI还是长期并存的局面。iSCSI目前已经非常成熟，而NVMe-oF则刚刚开始发展，需要不断地完善，并且借鉴iSCSI协议的一些功能，以支持更多的功能。
+
+SPDK在2016年7月发布了第一款NVMe-oF Target的代码，遵循了NVMe over fabrics相关的规范。SPDK的NVMe-oF Target实现要早于Linux Kernel NVMe-oF Target的正式发布。当然在新Linux发行版都自带 NVMe-oF Target的时候，大家就会有一个疑问，我们为什么要使用SPDK的NVMe-oF Target。
+SPDK的NVMe-oF Target和内核相比，在单核的性能 (Performance/per CPU core)上有绝对的优势。  
+
+· SPDK的NVMe-oF Target可以直接使用SPDK NVMe用户态驱动封装的块设备，相对于内核所使用的NVMe驱动更具有优势。  
+· SPDK NVMe-oF Target完全使用了SPDK提供的编程框架，在所有I/O的路径上都采用了无锁的机制，为此极大地提高了性能。  
+· 对RDMA Ethernet transport的高效利用。  
+
+SPDK NVMe-oF Target的主程序位于spdk/app/nvmf_tgt。因为 NVMe-oF和iSCSI一样都有相应的subsystem(代码位于 spdk/lib/event/subsystems/nvmf)，只有在配置文件或RPC接口中调用了相应的函数，才会触发相应的初始化工作。<u>这部分代码最重要的函数是nvmf_tgt_advance_state，主要通过状态机的形式来初始化和运行整个NVMe-oF Target系统。另外一部分代码位于spdk/lib/nvmf，主要是处理来自远端的NVMe-oF请求，包括transport层的抽象，以及实际基于RDMA transport的实现。如果读者希望学习SPDK NVMe-oF Target的细节，可以从spdk/lib/event/subsystems/nvmf目录的nvmf_tgt.c中的 spdk_nvmf_subsystem_init函数入手。</u>
+
+
+#### 4.4.7 SPDK RPC
+<u>SPDK软件库实现了一个基于JSON-RPC 2.0的服务，以允许外部的管理工具动态地配置基于SPDK软件的服务器应用，或使用监控工具动态地获取SPDK应用的运行状态。</u>目前，JSON-RPC是SPDK软件库中最主要的监控管理工具，SPDK软件库中包含的各个组件均有一些相应的RPC方法供用户调用。未来SPDK软件库会增添更多的RPC方法，来提高管理SPDK各个子系统或模块的灵活性，并减少对静态配置的依赖。  
+
+##### 1.RPC
+当把整个应用程序散布在互相通信的多个进程中时，一种方式是各个进程可以进行显式的网络编程，通过socket或进程间通信的API来编写交互过程。另一种方式则是使用隐式网络编程，即使用过程调用来完成，这样调用过程中涉及的网络I/O处理或进程间通信的细节，对于开发者而言基本上是透明的，可以省去部分工作量，并提高了开发软件应用的速度。   
+
+RPC是指一个应用程序调用不在自己地址空间中的子程序的过程。 RPC是一种Client-Server的交互方式，调用发起者为客户端，子程序执行者为Server端，通常通过消息机制完成请求与响应的传递。RPC调用两端的进程既可以处于不同的主机上通过网络来传递消息，也可以在同一主机上通过进程间通信来传递消息
+
+为了提供多样的Server端应用，基于不同服务的实现细节差异，各个RPC系统互不兼容，比如网络文件系统的RPC接口与SUN RPC互不兼容。<u>同时，为了允许不同的客户端访问Server端的应用，实现跨平台服务，目前已有许多标准化的RPC系统出现，比如JSON-RPC协议既可以为Java应用服务，也可以为C、Python等编程语言的应用服务。</u>
+
+##### 2.JSON
+JSON(JavaScript Object Notation)是一种轻量级的数据交换格式。既易于人阅读和编写，也易于机器解析和生成。<u>JSON包括4个基本类型String、Numbers、Booleans和Null，以及两个结构化类型Objects和Arrays的数据。</u>  
+
+典型的JSON语法规则如下。   
+· JSON名/值对:JSON数据的书写格式是“名/值”对。如，"firstName" : "John"。   
+· JSON对象:JSON对象在花括号中书写，对象可以包含多个名/值对。
+
+```json
+  { "firstName":"John","lastName":"Doe" }。
+```
+
+· JSON数组:JSON数组在方括号中书写，数组可以包含多个对象。在下面的例子中，对象 "employees" 是包含2个对象的数组，每个对象代表一条关于某个人(包括姓和名)的记录。  
+```json
+{
+	"employees":[
+		{"firstName":"John", "lastName":"Doe"},
+		{"firstName":"Anna", "lastName":"Smith"}
+	]
+}
+```
+
+##### 3.JSON-RPC
+JSON-RPC是RPC的一种规范，一个无状态且轻量级的协议，实现及使用简单。JSON-RPC规范主要定义了一些数据结构及其相关的处理规则，它被允许运行在基于socket、HTTP等许多不同消息传输环境的进程中，并使用JSON作为数据格式。  
+##### 4.SPDK JSON-RPC
+<u>使用SPDK库中的RPC需要首先在SPDK的应用启动时使用“-r”参数 指定RPC Server的监听地址，
+默认地址为“/var/tmp/spdk.sock”。使用SPDK提供的客户端命令行工具“scripts/rpc.py”，
+可以方便地向SPDK Server端发起RPC调用。</u> 使用方法如下:
+
+```
+$ rpc.py [-h] [-s SERVER_ADDR] [-p PORT] [-v] <command> [parameters list]
+```
+其中，“-s”“-p”参数分别指定SPDK RPC Server端的监听地址和端口，“command”“parameters list”分别指定具体的RPC命令和对应的参数。
+
+获取command命令所需要的对应参数可以通过如下命令:
+```
+$ rpc.py <command> -h
+```
+
+##### 5.SPDK JSON-RPC运行机制  
+在启动SPDK的编程框架时，SPDK将会初始化RPC所需的功能。一 个RPC专用的socket文件会被创建在相应的路径上，然后SPDK会绑定并监听它。接下来，SPDK会在Master Core的Reactor上为RPC注册一个Poller，此后RPC所有的功能都会在这个Poller里执行，也就是说，所有SPDK的RPC Server端服务是执行在Master Core上的。    
+
+当一个SPDK RPC客户端发出RPC调用请求后，RPC Poller在轮询过程中，接受该连接，接下来接收该连接上客户端发出的请求内容，并解析为JSON请求。在SPDK中已经注册的所有RPC方法中通过逐个对比后，找出对应的方法并执行进入。在RPC的方法中，首先将JSON请求解析成函数执行过程中需要的参数，完成相应的功能。在完成功能后， 根据需要填写JSON响应，并将它加入发送队列。RPC Poller在轮询过程中，将该JSON响应发送给SPDK RPC客户端。
+
+SPDK中JSON-RPC所依赖的代码主要分布在以下4个部分。     
+· lib/jsonrpc:接收发送网络数据，解析和流化JSON请求。   
+· lib/rpc:将JSON-RPC适配到SPDK编程框架中。  
+· lib/json:具体的数据流与JSON结构的解析与流化方法。  
+· <module>_rpc.c:各个组件中以rpc结尾的C文件，如 bdev_malloc_rpc.c，定义并注册具体的SPDK RPC方法。  
+
+
+#### 4.4.8 SPDK生态工具介绍
